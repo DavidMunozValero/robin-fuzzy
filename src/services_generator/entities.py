@@ -10,12 +10,14 @@ import random
 import yaml
 
 from src.robin.supply.entities import Station, Corridor, Seat, TimeSlot, TSP, Line, RollingStock, Service
+from src.robin.supply.utils import convert_tree_to_dict, set_stations_ids, get_time
 from src.services_generator.utils import _get_distance
 from src.robin.scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, line_to_dict, \
     rolling_stock_to_dict, time_slot_to_dict, tsp_to_dict, service_to_dict
 from src.services_generator.utils import _get_end_time, _get_start_time, _to_station, _build_service
 
-from typing import Tuple, List, Dict
+from copy import deepcopy
+from typing import Any, Dict, List, Mapping, Tuple
 
 
 class ServiceGenerator:
@@ -38,21 +40,24 @@ class ServiceGenerator:
     """
 
     def __init__(self,
-                 stations: Path,
-                 corridors: Path,
-                 seats: Path,
-                 timetable: Path,
-                 rolling_stocks: Path,
-                 tsps: Path
+                 supply_config_path: Path,
         ) -> None:
-        self.stations = self._get_stations(stations)
-        self.corridors = self._get_corridors(corridors)
-        self.seats = self._get_seats(seats)
-        self.timetable = self._get_timetable(timetable)
-        self.rolling_stocks = self._get_rolling_stocks(rolling_stocks)
-        self.tsps = self._get_tsps(tsps)
-        self.lines = {}
-        self.time_slots = {}
+        """
+        Initialize the ServiceGenerator object
+
+        Args:
+            supply_config_path (Path): Path to the config file
+        """
+        with open(supply_config_path, 'r') as file:
+            data = yaml.load(file, Loader=yaml.CSafeLoader)
+
+        self.stations = self._get_stations(data, key='stations')
+        self.time_slots = self._get_time_slots(data, key='timeSlot')
+        self.corridors = self._get_corridors(data, self.stations, key='corridor')
+        self.lines = self._get_lines(data, self.corridors, key='line')
+        self.seats = self._get_seats(data, key='seat')
+        self.rolling_stock = self._get_rolling_stock(data, self.seats, key='rollingStock')
+        self.tsps = self._get_tsps(data, self.rolling_stock, key='trainServiceProvider')
         self.services = []
 
     def generate(self,
@@ -110,7 +115,10 @@ class ServiceGenerator:
 
         self._write_to_yaml(file_name, yaml_dict)
 
-    def _check_collisions(self, new_service: Service, listed_service: Service) -> bool:
+    def _check_collisions(self,
+                          new_service: Service,
+                          listed_service: Service
+                          ) -> bool:
         """
         Check if two services collide
 
@@ -121,7 +129,6 @@ class ServiceGenerator:
         Returns:
             bool: True if collision, False otherwise
         """
-
         # TODO: Check other types of collisions (different train but same line, etc.)
         if new_service.rolling_stock == listed_service.rolling_stock:
             start_dt_sl = _get_start_time(listed_service)
@@ -154,8 +161,7 @@ class ServiceGenerator:
         allow_collisions = self.config['services']['allow_collisions']
 
         while True:
-            corridor = self._get_random_corridor()
-            line = self._get_random_line(corridor)
+            line = self._get_random_line()
             time_slot = self._get_random_time_slot()
             tsp = self._get_random_tsp()
             rs = self._get_random_rs(tsp)
@@ -233,21 +239,6 @@ class ServiceGenerator:
         """
         return random.choice(list(self.tsps.values()))
 
-    def _get_random_corridor(self) -> Corridor:
-        """
-        Get a random corridor
-
-        Returns:
-            Corridor: Corridor object randomly selected from the available corridors
-        :return:
-        """
-        # corr_id = self.config.corridors.set_corridor
-        corr_id = self.config['corridors']['set_corridor']
-
-        if corr_id:
-            return self.corridors[corr_id]
-        return random.choice(list(self.corridors.values()))
-
     def _get_random_date(self) -> datetime.date:
         """
         This function will return a random datetime between two datetime objects.
@@ -298,246 +289,26 @@ class ServiceGenerator:
 
         return prices
 
-    def _get_random_time_slot(self, size: int = 10) -> TimeSlot:
+    def _get_random_time_slot(self) -> TimeSlot:
         """
         Get a random time slot
-
-        Args:
-            size (int): Size of the time slot in minutes
 
         Returns:
             TimeSlot: Time slot object
         """
-        start_time = datetime.timedelta(hours=random.randint(0, 23), minutes=random.randint(0, 59))
-        td_size = datetime.timedelta(minutes=size)
-        end_time = start_time + td_size
+        probs = self.config['time_slots']['probabilities'].values()
+        time_slot_id = random.choices(list(self.time_slots.keys()), weights=list(probs))[0]
+        return self.time_slots[time_slot_id]
 
-        if end_time > datetime.timedelta(hours=23, minutes=59):
-            hours = float(end_time.seconds // 3600)
-            minutes = float((end_time.seconds // 60) % 60)
-            end_time = datetime.timedelta(hours=hours, minutes=minutes)
-
-        hours = str(start_time.seconds // 3600)
-        minutes = str((start_time.seconds // 60) % 60)
-        td_minutes = str(td_size.seconds // 60)
-        id_ = f'{hours}:{minutes}_{td_minutes}'
-
-        if id_ in self.time_slots:
-            return self.time_slots[id_]
-        else:
-            time_slot = TimeSlot(id_=id_, start=start_time, end=end_time)
-            self.time_slots[id_] = time_slot
-            return time_slot
-
-    def _get_random_line(self, corridor: Corridor) -> Line:
+    def _get_random_line(self) -> Line:
         """
         Get random line from corridor
-
-        Args:
-            corridor: Corridor object
 
         Returns:
             Line: Line object
         """
-        path = random.choice(corridor.paths)  # path = List[Station]
-
-        if len(path) < 2:
-            raise ValueError('Path must have at least 2 stations')
-
-        if not self.config['lines']['sample']:
-            line_path = path
-        else:
-            max_stops = self.config['lines'].get('max_stops', None)
-            min_stations = 0 if not max_stops else len(path) - max_stops
-            num_delete = random.randint(min_stations, len(path) - 2)
-            white_list = self.config['lines'].get('white_list', [])
-
-            i = 0
-            ids_delete = []
-            while i < num_delete:
-                id_delete = random.randint(0, len(path))
-                if id_delete in white_list:
-                    continue
-                ids_delete.append(id_delete)
-                i += 1
-
-            line_path = []
-            for i, sta in enumerate(path):
-                if i not in ids_delete:
-                    line_path.append(sta)
-
-        line_bool_tuple = list(map(lambda s: 1 if s in line_path else 0, path))
-        new_id = line_path[0].id + '_' + line_path[-1].id + '_' + ''.join(map(str, line_bool_tuple))
-
-        if new_id in self.lines:
-            line = self.lines[new_id]
-        else:
-            name = f'Line {line_path[0].shortname}-{line_path[-1].shortname}'
-
-            line_ids = [sta.id for sta in line_path]
-            line_times = {}
-            for i, sta in enumerate(line_path):
-                if i == 0:
-                    line_times[sta.id] = (0.0, 0.0)
-                else:
-                    start_time = line_times[line_ids[i - 1]][1] + self.timetable[(line_ids[i - 1], line_ids[i])]
-                    line_times[sta.id] = (round(start_time, 2),
-                                          round(start_time + 3.0, 2))
-
-            # Generate random timetable
-            line = Line(id_=new_id, name=name, corridor=corridor, timetable=line_times)
-
-        self.lines[line.id] = line
-        return line
-
-    def _get_tsps(self, tsps_path: Path) -> Dict[int, TSP]:
-        """
-        Load TSPs
-
-        Args:
-            tsps_path (Path): Path to the csv file with TSPs
-
-        Returns:
-            Dict[int, TSP]: Dictionary of TSPs
-        """
-        df = pd.read_csv(tsps_path, delimiter=',', dtype={'id': int, 'name': str, 'rolling_stock': str})
-
-        def parse_rolling_stock(rolling_stock_str):
-            if rolling_stock_str:
-                rolling_stock_list = rolling_stock_str.split('_')
-                rolling_stock = [self.rolling_stocks[int(rs_id)] for rs_id in rolling_stock_list]
-                return rolling_stock
-            else:
-                return []
-
-        df['rolling_stock'] = df['rolling_stock'].apply(parse_rolling_stock)
-
-        tsp_dict = {}
-        for index, row in df.iterrows():
-            tsp = TSP(row['id'], row['name'], row['rolling_stock'])
-            tsp_dict[row['id']] = tsp
-
-        return tsp_dict
-
-    def _get_rolling_stocks(self, rolling_stocks_path: Path) -> Dict[int, RollingStock]:
-        """
-        Load timetable with reference travel times (in minutes) between each pair of stations from csv file
-
-        Args:
-            rolling_stocks_path (Path): Path to the csv file with rolling stocks
-
-        Returns:
-            Dict[Tuple[str, str], float]: Dict of travel times {(origin_id, destination_id): time}
-        """
-        df = pd.read_csv(rolling_stocks_path, delimiter=',', dtype={'id': int, 'name': str, 'seats': str})
-
-        def parse_seats(seats_str):
-            if seats_str:
-                seats_dict = {}
-                for pair in seats_str.split('_'):
-                    key, value = pair.split(':')
-                    seats_dict[int(key)] = int(value)
-                return seats_dict
-            else:
-                return {}
-
-        df['seats'] = df['seats'].apply(parse_seats)
-
-        rolling_stock_dict = {}
-        for index, row in df.iterrows():
-            rolling_stock = RollingStock(row['id'], row['name'], row['seats'])
-            rolling_stock_dict[row['id']] = rolling_stock
-
-        return rolling_stock_dict
-
-    def _get_timetable(self, timetable_path: Path) -> Dict[Tuple[str, str], float]:
-        """
-        Load timetable with reference travel times (in minutes) between each pair of stations from csv file
-
-        Args:
-            timetable_path (Path): Path to the csv file with timetable
-
-        Returns:
-            Dict[Tuple[str, str], float]: Dict of travel times {(origin_id, destination_id): time}
-        """
-        df = pd.read_csv(timetable_path, delimiter=',', dtype={'origin': str, 'destination': str, 'time': float})
-
-        timetable = {}
-        for index, pair_time in df.iterrows():
-            origin_id = str(pair_time['origin'])
-            destination_id = str(pair_time['destination'])
-            time = float(pair_time['time'])
-
-            timetable[(origin_id, destination_id)] = time
-
-        return timetable
-
-    def _get_stations(self, stations_path: Path) -> Dict[str, Station]:
-        """
-        Load stations from csv file
-
-        Args:
-            stations_path (Path): Path to the csv file with stations
-
-        Returns:
-            Dict[str, Station] Dict of Station objects {station_id: Station object}
-        """
-        df = pd.read_csv(stations_path, delimiter=',', dtype={'stop_id': str})
-
-        stations = {}
-        for index, station in df.iterrows():
-            id_ = station['stop_id']
-            name = station['stop_name']
-            city = station['stop_name']
-            shortname = str(station['stop_name'][:3]).upper()
-            coords = tuple(station[['stop_lat', 'stop_lon']])
-
-            stations[id_] = Station(id_, name, city, shortname, coords)
-
-        return stations
-
-    def _get_corridors(self, corridors_path: Path) -> Dict[int, Corridor]:
-        """
-        Load corridors from csv file
-
-        Args:
-            corridors_path (Path): Path to the csv file with corridors
-
-        Returns:
-            Dict[int, Corridor]: Dict of Corridor objects {corridor_id: Corridor object}
-        """
-        df = pd.read_csv(corridors_path, delimiter=',', dtype={'corridor_id': int})
-
-        corridors = {}
-        for index, corr in df.iterrows():
-            id_ = corr['corridor_id']
-            name = corr['corridor_name']
-            tree = ast.literal_eval(corr['tree'])
-            stations_tree = _to_station(tree, self.stations)
-
-            corridors[id_] = Corridor(id_, name, stations_tree)
-
-        return corridors
-
-    def _get_seats(self, seats_path: Path) -> Dict[int, Seat]:
-        """
-        Load seat types from csv file
-
-        Args:
-            seats_path (Path): Path to the csv file with seat types
-
-        Returns:
-            Dict[int, Seat]: Dict of Seat objects {seat_id: Seat object}
-        """
-        df = pd.read_csv(seats_path, delimiter=',', dtype={'id': int, 'hard_type': int, 'soft_type': int})
-
-        seats = {}
-        for index, s in df.iterrows():
-            assert all(k in s.keys() for k in ('id', 'name', 'hard_type', 'soft_type')), "Incomplete Seat data"
-
-            seats[s['id']] = Seat(s['id'], s['name'], s['hard_type'], s['soft_type'])
-
-        return seats
+        probs = self.config['lines']['probabilities'].values()
+        return random.choices(list(self.lines.values()), weights=list(probs))[0]
 
     @staticmethod
     def _write_to_yaml(filename: Path, objects):
@@ -570,3 +341,212 @@ class ServiceGenerator:
         random.seed(seed)
         np.random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
+
+    @staticmethod
+    def _get_stations(data: Mapping[Any, Any],
+                      key: str = 'stations'
+                      ) -> Dict[str, Station]:
+        """
+        Private method to build a dict of Station objects from YAML data.
+
+        Args:
+            data (Mapping[Any, Any]): YAML data as nested dict.
+            key (str): Key to access the data in the YAML file. Default: 'stations'.
+
+        Returns:
+            Dict[str, Station]: Dict of Station objects.
+        """
+        stations = {}
+        for s in data[key]:
+            assert all(k in s.keys() for k in ('id', 'name', 'short_name', 'city')), "Incomplete Station data"
+            lat, lon = tuple(s.get('coordinates', {'lat': None, 'lon': None}).values())
+            if not lat or not lon:
+                station_id = str(s['id'])
+                stations[station_id] = Station(station_id, s['name'], s['city'], s['short_name'])
+            else:
+                coords = (float(lat), float(lon))
+                stations[str(s['id'])] = Station(str(s['id']), s['name'], s['city'], s['short_name'], coords)
+        return stations
+
+    @staticmethod
+    def _get_time_slots(data: Mapping[Any, Any],
+                        key: str = 'timeSlot'
+                        ) -> Dict[str, TimeSlot]:
+        """
+        Private method to build a dict of TimeSlot objects from YAML data.
+
+        Args:
+            data (Mapping[Any, Any]): YAML data as nested dict.
+            key (str): Key to access the data in the YAML file. Default: 'timeSlot'.
+
+        Returns:
+            Dict[str, TimeSlot]: Dict of TimeSlot objects.
+        """
+        time_slots = {}
+        for time_slot in data[key]:
+            assert all(k in time_slot.keys() for k in ('id', 'start', 'end')), "Incomplete TimeSlot data"
+            time_slot_id = str(time_slot['id'])
+            time_slots[time_slot_id] = TimeSlot(time_slot_id, get_time(time_slot['start']), get_time(time_slot['end']))
+        return time_slots
+
+    @staticmethod
+    def _get_corridors(data: Mapping[Any, Any],
+                       stations: (Mapping[str, Station]),
+                       key: str = 'corridor'
+                       ) -> Dict[str, Corridor]:
+        """
+        Private method to build a dict of Corridor objects from YAML data.
+
+        Args:
+            data (Mapping[Any, Any]): YAML data as nested dict.
+            stations (Mapping[str, Station]): Dict of Station objects.
+            key (str): Key to access the data in the YAML file. Default: 'corridor'.
+
+        Returns:
+            Dict[str, Corridor]: Dict of Corridor objects.
+        """
+
+        def to_station(tree: Dict, sta_dict: Mapping[str, Station]) -> Dict[Station, Dict]:
+            """
+            Recursive function to build a tree of Station objects from a tree of station IDs.
+
+            Args:
+                tree (Mapping): Tree of station IDs.
+                sta_dict (Mapping[str, Station]): Dict of Station objects {station_id: Station object}
+
+            Returns:
+                Dict[Station, Dict]: Tree of Station objects.
+            """
+            if not tree:
+                return {}
+            return {sta_dict[node]: to_station(tree[node], sta_dict) for node in tree}
+
+        corridors = {}
+        for c in data[key]:
+            assert all(k in c.keys() for k in ('id', 'name', 'stations')), "Incomplete Corridor data"
+
+            tree_dictionary = convert_tree_to_dict(c['stations'])
+            corr_stations_ids = set_stations_ids(tree_dictionary)
+            assert all(s in stations.keys() for s in corr_stations_ids), "Station not found in Station list"
+
+            stations_tree = to_station(deepcopy(tree_dictionary), stations)
+            corridor_id = str(c['id'])
+            corridors[corridor_id] = Corridor(corridor_id, c['name'], stations_tree)
+
+        return corridors
+
+    @staticmethod
+    def _get_lines(data: Mapping[Any, Any],
+                   corridors: Mapping[str, Corridor],
+                   key='line'
+                   ) -> Dict[str, Line]:
+        """
+        Private method to build a dict of Line objects from YAML data.
+
+        Args:
+            data (Mapping[Any, Any]): YAML data
+            corridors (Mapping[str, Corridor]): Dict of Corridor objects.
+            key (str): Key to access the data in the YAML file. Default: 'line'.
+
+        Returns:
+            Dict[str, Line]: Dict of Line objects.
+        """
+        lines = {}
+        for ln in data[key]:
+            assert all(k in ln.keys() for k in ('id', 'name', 'corridor', 'stops')), 'Incomplete Line data'
+
+            corr_id = str(ln['corridor'])
+            assert corr_id in corridors.keys(), 'Corridor not found in Corridor list'
+            corr = corridors[corr_id]
+
+            for stn in ln['stops']:
+                assert all(k in stn for k in ('station', 'arrival_time', 'departure_time')), 'Incomplete Stops data'
+
+            corr_stations_ids = [s.id for s in corr.stations.values()]
+            assert all(s['station'] in corr_stations_ids for s in ln['stops']), 'Station not found in Corridor list'
+
+            timetable = {s['station']: (float(s['arrival_time']), float(s['departure_time']))
+                         for s in ln['stops']}
+            line_id = str(ln['id'])
+            lines[line_id] = Line(line_id, ln['name'], corr, timetable)
+
+        return lines
+
+    @staticmethod
+    def _get_seats(data: Mapping[Any, Any],
+                   key: str = 'seat'
+                   ) -> Dict[str, Seat]:
+        """
+        Private method to build a dict of Seat objects from YAML data.
+
+        Args:
+            data (Mapping[Any, Any]): YAML data.
+            key (str): Key to access the data in the YAML file. Default: 'seat'.
+
+        Returns:
+            Dict[str, Seat]: Dict of Seat objects.
+        """
+        seats = {}
+        for s in data[key]:
+            assert all(k in s.keys() for k in ('id', 'name', 'hard_type', 'soft_type')), 'Incomplete Seat data'
+            seat_id = str(s['id'])
+            seats[seat_id] = Seat(seat_id, s['name'], s['hard_type'], s['soft_type'])
+        return seats
+
+    @staticmethod
+    def _get_rolling_stock(data: Mapping[Any, Any],
+                           seats: Mapping[str, Seat],
+                           key: str = 'rollingStock'
+                           ) -> Dict[str, RollingStock]:
+        """
+        Private method to build a dict of RollingStock objects from YAML data.
+
+        Args:
+            data (Mapping[Any, Any]): YAML data.
+            seats (Mapping[str, Seat]): Dict of Seat objects.
+            key (str): Key to access the data in the YAML file. Default: 'rollingStock'.
+
+        Returns:
+            Dict[str, RollingStock]: Dict of RollingStock objects.
+        """
+        rolling_stocks = {}
+        for rolling_stock in data[key]:
+            assert all(k in rolling_stock.keys() for k in ('id', 'name', 'seats')), 'Incomplete RollingStock data'
+
+            for seat in rolling_stock['seats']:
+                assert all(key in seat for key in ('hard_type', 'quantity')), 'Incomplete seats data for RS'
+
+            assert all(seat['hard_type'] in [seat.hard_type for seat in seats.values()] for seat in
+                       rolling_stock['seats']), 'Invalid hard_type for RS'
+
+            rolling_stock_seats = {int(seat['hard_type']): int(seat['quantity']) for seat in rolling_stock['seats']}
+            rolling_stock_id = str(rolling_stock['id'])
+            rolling_stocks[rolling_stock_id] = RollingStock(rolling_stock_id,
+                                                            rolling_stock['name'],
+                                                            rolling_stock_seats)
+
+        return rolling_stocks
+
+    @staticmethod
+    def _get_tsps(data: Mapping[Any, Any],
+                  rolling_stock: Mapping[str, RollingStock],
+                  key: str = 'trainServiceProvider'
+        ) -> Dict[str, TSP]:
+        """
+        Private method to build a dict of TSP objects from YAML data.
+
+        Args:
+            data (Mapping[Any, Any])): YAML data
+            rolling_stock (Mapping[str, RollingStock]): Dict of RollingStock objects.
+            key (str): Key to access the data in the YAML file. Default: 'trainServiceProvider'.
+
+        Returns:
+            Dict[str, TSP]: Dict of TSP objects.
+        """
+        tsps = {}
+        for tsp in data[key]:
+            assert all(k in tsp.keys() for k in ('id', 'name', 'rolling_stock')), 'Incomplete TSP data'
+            assert all(str(i) in rolling_stock.keys() for i in tsp['rolling_stock']), 'Unknown RollingStock ID'
+            tsp_id = str(tsp['id'])
+            tsps[tsp_id] = TSP(tsp_id, tsp['name'], [rolling_stock[str(rs_id)] for rs_id in tsp['rolling_stock']])
+        return tsps

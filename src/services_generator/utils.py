@@ -3,7 +3,7 @@
 import datetime
 from math import sin, cos, acos, radians
 from src.robin.supply.entities import Station, Line, TimeSlot, TSP, RollingStock, Service
-from typing import List, Dict
+from typing import Dict, List
 
 
 def _get_start_time(s):
@@ -87,7 +87,9 @@ def _build_service(date: datetime.date,
     Returns:
         Service: Service object
     """
-    return Service(id_=f'{line.id}_{time_slot.id}',
+    date_str = date.strftime('%Y-%m-%d')
+    time_str = ".".join(str(time_slot.start).split(":")[:2])
+    return Service(id_=f'{line.id}_{date_str}-{time_str}',
                    date=date,
                    line=line,
                    time_slot=time_slot,
