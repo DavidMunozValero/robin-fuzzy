@@ -10,7 +10,6 @@ from src.robin.scraping.utils import *
 from collections import OrderedDict
 from typing import Dict, List, Tuple
 
-RENFE_STATIONS_PATH = f'data/renfe/renfe_stations.csv'
 DEFAULT_SEAT_QUANTITY = {1: 250, 2: 50}
 INFLATION = 1.0
 
@@ -34,7 +33,7 @@ class DataLoader:
         services (Dict[str, Service]): Dictionary with services
     """
 
-    def __init__(self, stops_path: str, renfe_stations_path: str = RENFE_STATIONS_PATH):
+    def __init__(self, stops_path: str, renfe_stations_path: str):
         """
         Constructor of the class
 
@@ -184,9 +183,6 @@ class DataLoader:
     def _build_corridor(self) -> None:
         """
         Get corridor from stops dataframe
-
-        Returns:
-            corridor: list of Station() objects
         """
         # Get list of stations in corridor
         corridor_stations = self._get_corridor_stations()
@@ -218,7 +214,7 @@ class DataLoader:
         Get line from stops dataframe
         Args:
             stops: dataframe with stops
-            corr: Corridor() object
+            corridor: Corridor() object
         Returns:
              Line() object
         """
@@ -323,8 +319,6 @@ class DataLoader:
 
         Args:
             service_id: string
-            departure: string
-            price: tuple of floats
             line: Line() object
             tsp: TSP() object
             rs: RollingStock() object
