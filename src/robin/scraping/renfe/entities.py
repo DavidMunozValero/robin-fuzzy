@@ -388,7 +388,7 @@ class DriverManager:
             pd.DataFrame: DataFrame with the scraped data.
         """
         records = []
-        date_str = date.strftime('%d-%m-%Y')  # Format date to match Renfe website format
+        date_str = date.strftime('%d/%m/%Y')  # Format date to match Renfe website format
         root = 'https://venta.renfe.com/vol/'
         query = f'buscarTren.do?tipoBusqueda=autocomplete&currenLocation=menuBusqueda&vengoderenfecom=SI&cdgoOrigen={origin_id}&cdgoDestino={destination_id}&idiomaBusqueda=s&FechaIdaSel={date_str}&_fechaIdaVisual={date_str}&adultos_=1&ninos_=0&ninosMenores=0&numJoven=0&numDorada=0&codPromocional='
 
