@@ -237,7 +237,25 @@ class ServiceGenerator:
             Line: Line object
         """
         probs = self.config['lines']['probabilities'].values()
-        return random.choices(list(self.lines.values()), weights=list(probs))[0]
+        line = random.choices(list(self.lines.values()), weights=list(probs))[0]
+
+        timetable = {}
+        for i, station in enumerate(line.timetable):
+            arrival, departure = line.timetable[station]
+
+            if i == 0:
+                prev_dt = departure
+            else:
+                ref_stop_time = departure - arrival
+                travel_time = arrival - prev_dt
+                arrival = float(round(prev_dt + (travel_time + travel_time * np.random.uniform(low=0.0, high=0.2))))
+                departure = float(round(arrival + ref_stop_time + ref_stop_time * np.random.uniform(low=0.0, high=0.2)))
+
+            timetable[station] = (arrival, departure)
+
+        # Encode timetable to string (Hash or something) for unique line id based on timetable
+        line_id = str(hash(str(timetable.values())))
+        return Line(line.id, line.name, line.corridor, timetable)
 
     @staticmethod
     def _write_to_yaml(filename: Path, objects):
