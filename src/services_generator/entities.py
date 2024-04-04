@@ -221,8 +221,8 @@ class ServiceGenerator:
         Returns:
             TimeSlot: Time slot object
         """
-        probabilities = self.config['time_slots']['probabilities'].values()
-        hour = random.choices(list(self.time_slots.keys()), weights=list(probabilities))[0]
+        ts_probabilities = self.config['time_slots']['probabilities']
+        hour = random.choices(list(ts_probabilities.keys()), weights=list(ts_probabilities.values()))[0]
         minutes = random.randint(0, 59)
         start_time = datetime.timedelta(hours=hour, minutes=minutes)
         end_time = start_time + datetime.timedelta(minutes=10)
