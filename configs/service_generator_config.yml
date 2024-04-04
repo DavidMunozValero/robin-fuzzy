@@ -52,4 +52,4 @@ prices:
 services:
   dates: # Set range for random dates
     min: 2024-06-25
-    max: 2024-06-25
+    max: 2024-06-26
