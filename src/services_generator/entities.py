@@ -28,8 +28,7 @@ class ServiceGenerator:
         stations (Dict[str, Station]): Dict of stations
         corridors (Dict[str, Corridor]): Dict of corridors
         seats (Dict[str, Seat]): Dict of seats
-        timetable (pd.DataFrame): Timetable
-        rolling_stocks (Dict[str, RollingStock]): Dict of rolling stocks
+        rolling_stock (Dict[str, RollingStock]): Dict of rolling stocks
         tsps (Dict[str, TSP]): Dict of TSPs
         lines (Dict[str, Line]): Dict of lines
         time_slots (Dict[str, TimeSlot]): Dict of time slots
@@ -115,42 +114,6 @@ class ServiceGenerator:
 
         self._write_to_yaml(file_name, yaml_dict)
 
-    def _check_collisions(self,
-                          new_service: Service,
-                          listed_service: Service
-                          ) -> bool:
-        """
-        Check if two services collide
-
-        Args:
-            new_service (Service): New service
-            listed_service (Service): Service in the list of services
-
-        Returns:
-            bool: True if collision, False otherwise
-        """
-        # TODO: Check other types of collisions (different train but same line, etc.)
-        if new_service.rolling_stock == listed_service.rolling_stock:
-            start_dt_sl = _get_start_time(listed_service)
-            end_dt_sl = _get_end_time(listed_service)
-            start_dt_ns = _get_start_time(new_service)
-            end_dt_ns = _get_end_time(new_service)
-
-            if start_dt_ns <= end_dt_sl and end_dt_ns >= start_dt_sl:
-                return True
-
-            ref_time_left = self._get_ref_time(new_service, listed_service)
-            ref_time_right = self._get_ref_time(listed_service, new_service)
-
-            if end_dt_ns > start_dt_sl:
-                if end_dt_sl + ref_time_right > start_dt_ns:
-                    return True
-            else:
-                if end_dt_ns + ref_time_left > start_dt_sl:
-                    return True
-        return False
-
-    # Remove seed from config file
     def _generate_service(self) -> Service:
         """
         Generate a random service
@@ -158,54 +121,16 @@ class ServiceGenerator:
         Returns:
             Service: Service object
         """
-        allow_collisions = self.config['services']['allow_collisions']
+        line = self._get_random_line()
+        time_slot = self._get_random_time_slot()
+        tsp = self._get_random_tsp()
+        rs = self._get_random_rs(tsp)
+        date = self._get_random_date()
+        prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
+        service = _build_service(date, line, time_slot, tsp, rs, prices)
 
-        while True:
-            line = self._get_random_line()
-            time_slot = self._get_random_time_slot()
-            tsp = self._get_random_tsp()
-            rs = self._get_random_rs(tsp)
-            date = self._get_random_date()
-            prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
-            service = _build_service(date, line, time_slot, tsp, rs, prices)
-
-            if allow_collisions:
-                self.services.append(service)
-                return service
-
-            if not any(self._check_collisions(service, s) for s in self.services):
-                self.services.append(service)
-                return service
-
-    def _get_ref_time(self, service_1: Service, service_2: Service) -> datetime.timedelta:
-        """
-        Get reference time between two services
-
-        Args:
-            service_1 (Service): First service
-            service_2 (Service): Second service
-
-        Returns:
-            datetime.timedelta: Reference time between stations
-        """
-        last_stop_ns = service_1.line.stations[-1].id
-        first_stop_sl = service_2.line.stations[0].id
-
-        if last_stop_ns == first_stop_sl:
-            return datetime.timedelta(0)
-
-        if (last_stop_ns, first_stop_sl) in self.timetable.keys():
-            ref_time = self.timetable[(last_stop_ns, first_stop_sl)]
-        elif (first_stop_sl, last_stop_ns) in self.timetable.keys():
-            ref_time = self.timetable[(first_stop_sl, last_stop_ns)]
-        else:
-            raise ValueError(f'No timetable entry for {(last_stop_ns, first_stop_sl)} or '
-                             f'{(first_stop_sl, last_stop_ns)}')
-
-        hours = int(ref_time / 60)
-        minutes = int(ref_time % 60)
-        seconds = int((ref_time - int(ref_time)) * 60)
-        return datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
+        self.services.append(service)
+        return service
 
     def _set_config(self, path_config: Path):
         """
@@ -296,9 +221,13 @@ class ServiceGenerator:
         Returns:
             TimeSlot: Time slot object
         """
-        probs = self.config['time_slots']['probabilities'].values()
-        time_slot_id = random.choices(list(self.time_slots.keys()), weights=list(probs))[0]
-        return self.time_slots[time_slot_id]
+        probabilities = self.config['time_slots']['probabilities'].values()
+        hour = random.choices(list(self.time_slots.keys()), weights=list(probabilities))[0]
+        minutes = random.randint(0, 59)
+        start_time = datetime.timedelta(hours=hour, minutes=minutes)
+        end_time = start_time + datetime.timedelta(minutes=10)
+        time_slot_id = f'{start_time.seconds}'
+        return TimeSlot(time_slot_id, start_time, end_time)
 
     def _get_random_line(self) -> Line:
         """
