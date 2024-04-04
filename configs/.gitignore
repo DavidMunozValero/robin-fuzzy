@@ -29,3 +29,5 @@
 !ewgt23/supply_data_doubled_capacities.yml
 !ewgt23/supply_data_increased_prices.yml
 !ewgt23/behaviour_config/*.txt
+!service_generator
+!service_generator/config.yml
