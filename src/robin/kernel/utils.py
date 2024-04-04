@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.robin.demand.entities import Passenger
+from ..demand.entities import Passenger
 
 from typing import Union
 

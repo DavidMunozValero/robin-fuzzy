@@ -3,9 +3,9 @@
 import numpy as np
 import pandas as pd
 
-from src.robin.supply.entities import Station, TimeSlot, Corridor, Line, Seat, RollingStock, TSP, Service, Supply
-from src.robin.supply.utils import get_time
-from src.robin.scraping.utils import *
+from ..supply.entities import Station, TimeSlot, Corridor, Line, Seat, RollingStock, TSP, Service, Supply
+from ..supply.utils import get_time
+from ..scraping.utils import *
 
 from collections import OrderedDict
 from typing import Dict, List, Tuple

@@ -4,7 +4,7 @@ import datetime
 import os
 import yaml
 
-from src.robin.supply.entities import Station, TimeSlot, Corridor, Line, Seat, RollingStock, TSP, Service
+from ..supply.entities import Station, TimeSlot, Corridor, Line, Seat, RollingStock, TSP, Service
 
 from copy import deepcopy
 from typing import Dict, List, Mapping

@@ -1,5 +1,6 @@
 """ Clase padre de todos los tipos de variables"""
-from src.robin.decision_model.terms import MembershipFS
+from .terms import MembershipFS
+
 
 class Variable():
     """ Clase para modelar una variable de cualquier tipo. Es la clase padre de todas.

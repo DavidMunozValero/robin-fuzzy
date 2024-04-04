@@ -5,8 +5,8 @@ import pandas as pd
 import random
 import os
 
-from src.robin.demand.entities import Demand, Passenger
-from src.robin.supply.entities import Service, Supply
+from ..demand.entities import Demand, Passenger
+from ..supply.entities import Service, Supply
 from .utils import get_constrain_value
 
 from pathlib import Path

@@ -2,8 +2,8 @@ import numpy as np
 
 from typing import Callable
 
-from src.robin.decision_model.propositions import PDC, FuzzyAP
-from src.robin.decision_model.terms import EnumeratedFS
+from .propositions import PDC, FuzzyAP
+from .terms import EnumeratedFS
 
 
 class RD():

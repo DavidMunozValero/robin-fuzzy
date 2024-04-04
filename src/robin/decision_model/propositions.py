@@ -3,10 +3,11 @@ proposiciones herencia
 """
 from typing import Callable
 
-from src.robin.decision_model.variables import Variable, RealV, CategoryV, LinguisticV
-from src.robin.decision_model.terms import Term, RealT, CategoryT, MembershipFS
+from .variables import Variable, RealV, CategoryV, LinguisticV
+from .terms import Term, RealT, CategoryT, MembershipFS
 
-class AtomicProposition():
+
+class AtomicProposition:
     """ Clase para modelar una proposición atómica
 
         Esta clase modela las proposiciones atómicas, por ejemplo:

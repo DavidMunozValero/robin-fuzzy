@@ -2,7 +2,7 @@
 
 import datetime
 from math import sin, cos, acos, radians
-from src.robin.supply.entities import Station, Line, TimeSlot, TSP, RollingStock, Service
+from ..robin.supply.entities import Station, Line, TimeSlot, TSP, RollingStock, Service
 from typing import Dict, List
 
 
@@ -66,13 +66,13 @@ def _tree_to_yaml(dict_tree: Dict[Station, Dict]) -> List[Dict]:
         return [{'org': node, 'des': _tree_to_yaml(dict_tree[node])} for node in dict_tree]
 
 
-def _build_service(date: datetime.date,
-                   line: Line,
-                   time_slot: TimeSlot,
-                   tsp: TSP,
-                   rs: RollingStock,
-                   prices: Dict
-                   ) -> Service:
+def build_service(date: datetime.date,
+                  line: Line,
+                  time_slot: TimeSlot,
+                  tsp: TSP,
+                  rs: RollingStock,
+                  prices: Dict
+                  ) -> Service:
     """
     Build service object from parameters
 

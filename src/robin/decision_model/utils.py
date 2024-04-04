@@ -1,10 +1,10 @@
 from json import load
 from typing import List, Mapping
 
-from src.robin.decision_model.terms import trapezoidal, MembershipFS
-from src.robin.decision_model.propositions import PDC
-from src.robin.decision_model.fuzzy_rule import TSKRule
-from src.robin.decision_model.others import funciones
+from .terms import trapezoidal, MembershipFS
+from .propositions import PDC
+from .fuzzy_rule import TSKRule
+from .others import funciones
 
 
 def read_json_variables(file_name, var_names):

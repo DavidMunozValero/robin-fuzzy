@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from src.robin.decision_model.terms import EnumeratedFS
+from .terms import EnumeratedFS
 
 
 def dibuja_cto_enumerado(x, y, eti_leyenda:str):

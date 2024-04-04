@@ -1,7 +1,7 @@
 """ Importación de módulos necesarios"""
 
-from src.robin.decision_model.fuzzy_rule import RD, MandaniRule, TSKRule
-from src.robin.decision_model.terms import EnumeratedFS, enumerated_fs_union
+from .fuzzy_rule import RD, MandaniRule, TSKRule
+from .terms import EnumeratedFS, enumerated_fs_union
 
 
 class FuzzyModel():

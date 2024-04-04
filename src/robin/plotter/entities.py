@@ -1,13 +1,12 @@
 """Entities for the plotter module."""
 
-import datetime
 import locale
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
-from src.robin.supply.entities import Supply
-from src.robin.labs.utils import *
+from ..supply.entities import Supply
+from ..labs.utils import *
+
 from calendar import month_name
 from typing import Mapping, Tuple, Union
 

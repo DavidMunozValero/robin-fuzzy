@@ -1,20 +1,18 @@
 """Entities for the services generator module."""
 
-import ast
 import datetime
 import numpy as np
 import os
-import pandas as pd
 from pathlib import Path
 import random
 import yaml
 
-from src.robin.supply.entities import Station, Corridor, Seat, TimeSlot, TSP, Line, RollingStock, Service
-from src.robin.supply.utils import convert_tree_to_dict, set_stations_ids, get_time
-from src.services_generator.utils import _get_distance
-from src.robin.scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, line_to_dict, \
+from ..robin.supply.entities import Station, Corridor, Seat, TimeSlot, TSP, Line, RollingStock, Service
+from ..robin.supply.utils import convert_tree_to_dict, set_stations_ids, get_time
+from .utils import _get_distance
+from ..robin.scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, line_to_dict, \
     rolling_stock_to_dict, time_slot_to_dict, tsp_to_dict, service_to_dict
-from src.services_generator.utils import _get_end_time, _get_start_time, _to_station, _build_service
+from .utils import build_service
 
 from copy import deepcopy
 from typing import Any, Dict, List, Mapping, Tuple
@@ -51,12 +49,12 @@ class ServiceGenerator:
             data = yaml.load(file, Loader=yaml.CSafeLoader)
 
         self.stations = self._get_stations(data, key='stations')
-        self.time_slots = self._get_time_slots(data, key='timeSlot')
         self.corridors = self._get_corridors(data, self.stations, key='corridor')
         self.lines = self._get_lines(data, self.corridors, key='line')
         self.seats = self._get_seats(data, key='seat')
         self.rolling_stock = self._get_rolling_stock(data, self.seats, key='rollingStock')
         self.tsps = self._get_tsps(data, self.rolling_stock, key='trainServiceProvider')
+        self.time_slots = {}
         self.services = []
 
     def generate(self,
@@ -127,7 +125,7 @@ class ServiceGenerator:
         rs = self._get_random_rs(tsp)
         date = self._get_random_date()
         prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
-        service = _build_service(date, line, time_slot, tsp, rs, prices)
+        service = build_service(date, line, time_slot, tsp, rs, prices)
 
         self.services.append(service)
         return service
@@ -227,7 +225,9 @@ class ServiceGenerator:
         start_time = datetime.timedelta(hours=hour, minutes=minutes)
         end_time = start_time + datetime.timedelta(minutes=10)
         time_slot_id = f'{start_time.seconds}'
-        return TimeSlot(time_slot_id, start_time, end_time)
+        ts = TimeSlot(time_slot_id, start_time, end_time)
+        self.time_slots[time_slot_id] = ts
+        return ts
 
     def _get_random_line(self) -> Line:
         """
