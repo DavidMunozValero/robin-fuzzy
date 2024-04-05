@@ -657,13 +657,13 @@ class Supply:
             services (List[Service]): List of services available in the system.
         """
         self.services = services
-        self.stations = list(set(station for service in services for station in service.line.stations))
+        self.stations = list(set(station for service in services for station in service.line.corridor.stations.values()))
         self.max_distance = max(geopy.distance.geodesic(sta_a.coords, sta_b.coords).km for i, sta_a in enumerate(self.stations) for sta_b in self.stations[i+1:])
         self.time_slots = list(set(service.time_slot for service in services))
         self.corridors = list(set(service.line.corridor for service in services))
         self.lines = list(set(service.line for service in services))
         self.seats = list(set(seat for service in services for t in service.prices.values() for seat in t.keys()))
-        self.rolling_stocks = list(set(service.rolling_stock for service in services))
+        self.rolling_stocks = list(set(rs for service in services for rs in service.tsp.rolling_stock))
         self.tsps = list(set(service.tsp for service in services))
 
     @classmethod
