@@ -1,13 +1,9 @@
-import numpy as np
-
 from ..demand.entities import Passenger
-
-from typing import Union
 
 
 def get_constrain_value(passenger: Passenger,
                         variable_name: str,
-                        ) -> Union[float, np.NaN]:
+                        ) -> float:
     """
     Get the maximum value of a variable in the user pattern rules.
 
