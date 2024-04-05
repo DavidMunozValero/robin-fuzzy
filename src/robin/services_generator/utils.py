@@ -2,7 +2,7 @@
 
 import datetime
 from math import sin, cos, acos, radians
-from ..robin.supply.entities import Station, Line, TimeSlot, TSP, RollingStock, Service
+from ..supply.entities import Station, Line, TimeSlot, TSP, RollingStock, Service
 from typing import Dict, List
 
 

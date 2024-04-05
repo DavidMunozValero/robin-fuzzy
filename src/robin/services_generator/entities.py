@@ -7,10 +7,10 @@ from pathlib import Path
 import random
 import yaml
 
-from ..robin.supply.entities import Station, Corridor, Seat, TimeSlot, TSP, Line, RollingStock, Service
-from ..robin.supply.utils import convert_tree_to_dict, set_stations_ids, get_time
+from ..supply.entities import Station, Corridor, Seat, TimeSlot, TSP, Line, RollingStock, Service
+from ..supply.utils import convert_tree_to_dict, set_stations_ids, get_time
 from .utils import _get_distance
-from ..robin.scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, line_to_dict, \
+from ..scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, line_to_dict, \
     rolling_stock_to_dict, time_slot_to_dict, tsp_to_dict, service_to_dict
 from .utils import build_service
 
