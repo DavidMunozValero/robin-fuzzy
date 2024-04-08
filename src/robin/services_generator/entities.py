@@ -224,6 +224,9 @@ class ServiceGenerator:
         minutes = random.randint(0, 59)
         start_time = datetime.timedelta(hours=hour, minutes=minutes)
         end_time = start_time + datetime.timedelta(minutes=10)
+        if end_time >= datetime.timedelta(hours=24):
+            # Decrease time by a full day
+            end_time -= datetime.timedelta(days=1)
         time_slot_id = f'{start_time.seconds}'
         ts = TimeSlot(time_slot_id, start_time, end_time)
         self.time_slots[time_slot_id] = ts

@@ -144,8 +144,6 @@ class UserPattern:
         Args:
             id (int): The user pattern id.
             name(str): The user pattern name.
-            behaviour_rules (List[Mapping]): The rules of the behaviour model.
-            behaviour_variables (Mapping[str, str]): The variables of the behaviour model.
             arrival_time (str): The arrival time distribution name.
             arrival_time_kwargs (Mapping[str, Union[int, float]]): The arrival time distribution named parameters.
             purchase_day (str): The purchase day distribution name.
@@ -176,6 +174,8 @@ class UserPattern:
         """
         self.id = id
         self.name = name
+        self._rules = rules
+        self._variables = variables
         self.behaviour_variables = get_variables_from_dict(variables)
         self.behaviour_rules = get_rules_from_dict(rules, self.behaviour_variables)
         self._arrival_time, self.arrival_time_kwargs = get_scipy_distribution(
@@ -409,7 +409,6 @@ class DemandPattern:
         id (int): The demand pattern id.
         name(str): The demand pattern name.
         markets (List[Market]): The list of markets.
-        potential_demands(Mapping[Market, Callable]): The potential demand distribution for each market.
         potential_demands_kwargs (Mapping[Market, Mapping[str, Union[int, float]]]): The keyword arguments
             for the potential demand distribution for each market.
         user_patterns_distribution (Mapping[Market, Mapping[UserPattern, float]]): The distribution of user patterns
@@ -580,6 +579,7 @@ class Day:
             potential_demand = self.demand_pattern.potential_demand(market)
             for i in range(potential_demand):
                 user_pattern = self.demand_pattern.get_user_pattern(market)
+                # Slightly randomize user pattern attributes
                 passengers.append(
                     Passenger(
                         id=i + id_offset,
