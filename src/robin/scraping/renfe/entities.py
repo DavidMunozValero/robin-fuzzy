@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import re
 import requests
+import time
 import unicodedata
 
 from src.robin.scraping.renfe.utils import format_duration, is_number, remove_blanks, time_to_minutes
@@ -27,6 +28,7 @@ SCHEDULE_URL = 'https://horarios.renfe.com/HIRRenfeWeb/'
 SAVE_PATH = 'data/renfe'
 RENFE_STATIONS_CSV = f'{SAVE_PATH}/renfe_stations.csv'
 LR_RENFE_SERVICES = ['AVE', 'AVLO', 'ALVIA', 'AVANT']
+
 
 class DriverManager:
     """
@@ -52,7 +54,7 @@ class DriverManager:
         driver_options = Options()
         driver_options.add_argument('--disable-extensions')
         # driver_options.add_argument('--disable-gpu')
-        driver_options.add_argument('--headless')  # Don't open browser window
+        # driver_options.add_argument('--headless')  # Don't open browser window
         self.driver = webdriver.Chrome(options=driver_options)
 
         self.stations_df = stations_df
@@ -348,7 +350,7 @@ class DriverManager:
         print('Search url: ', url)
         return url
 
-    def _request_price(self, url: str, patience: int = 25) -> Union[str, bool]:
+    def _request_price(self, url: str, patience: int = 25) -> Union[str, None]:
         """
         Request a page and wait for the price to load.
 
@@ -360,13 +362,14 @@ class DriverManager:
             str: HTML of the page if the price loaded, False otherwise.
         """
         self.driver.get(url)
-
+        div_trains = self.driver.find_element(By.ID, 'listaTrenesTBodyIda')
         try:
-            WebDriverWait(self.driver, patience).until(EC.presence_of_element_located((By.CLASS_NAME, 'trayectoRow')))
+            WebDriverWait(self.driver, patience).until(EC.visibility_of_element_located((By.ID, 'listaTrenesTBodyIda')))
         except TimeoutException:
-            return False
-
-        return self.driver.page_source
+            div_trains = None
+        print(dir(div_trains))
+        print("PLANES OPCIONES: ", div_trains.find_element(By.CLASS_NAME, 'planes-opciones'))
+        return div_trains.text if div_trains else None
 
     def scrape_prices(
             self,
@@ -395,13 +398,17 @@ class DriverManager:
         url = root + query
         print('Date: ', date)
         print('Search url: ', url)
-        html_str = self._request_price(url)
-        if not html_str:
+        web_element = self._request_price(url)
+        if not web_element:
             print('Error retrieving prices. Skipping...')
             return pd.DataFrame()
 
-        soup = BeautifulSoup(html_str, 'html.parser')
-        table = soup.find('div', {'class': 'tab-content'})
+        print(web_element)
+        trains_data = web_element.find_elements(By.CLASS_NAME, 'row selectedTren')
+        # TODO:
+
+        """
+        table = soup.find_all('div', {'class': 'row selectedTren'})
         if not table:
             return None
         header = soup.find('thead')
@@ -420,6 +427,7 @@ class DriverManager:
             return pd.DataFrame()
         col_names = ['trip_id', 'origin', 'destination', 'train_type', 'departure', 'arrival', 'duration', 'prices']
         return self._get_prices_dataframe(records=records, col_names=col_names)
+        """
 
     def scrape_stations(self, url: str) -> Dict[str, str]:
         """
