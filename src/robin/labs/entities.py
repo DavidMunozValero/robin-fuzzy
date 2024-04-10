@@ -2,7 +2,7 @@
 
 import copy
 import os
-import progressbar
+import random
 import shutil
 import yaml
 
@@ -14,7 +14,8 @@ from ..plotter.utils import plot_series
 
 from matplotlib import pyplot as plt
 from pathlib import Path
-from typing import Mapping
+from tqdm.notebook import tqdm
+from typing import Any, Mapping
 
 
 class RobinLab:
@@ -46,7 +47,6 @@ class RobinLab:
         self.tmp_path = tmp_path
         self.lab_config = None
         self.verbose = verbose
-        self.seed = None
 
     def set_lab_config(self, config: Mapping):
         """
@@ -67,8 +67,6 @@ class RobinLab:
             self._supply_yaml_editor()
         else:
             raise ValueError("At least one of the lab configs must be non-empty.")
-
-        self.seed = self.lab_config.get("seed", None)
 
     def _create_tmp_dir(self):
         """
@@ -108,25 +106,23 @@ class RobinLab:
         # TODO: Temporary fix only to test prices
         supply_lab_config = self.lab_config["supply"]
         arange_args = supply_lab_config["prices"]
-        with progressbar.ProgressBar(min_value=1, max_value=len(np.arange(**arange_args))) as bar:
-            for i, factor in enumerate(np.arange(**arange_args), start=1):
-                modified_data = copy.deepcopy(original_data)
-                modified_services = modified_data.get('service')
-                assert modified_services, "No services found in the supply config."
-                for service in modified_services:
-                    modify_prices(service['origin_destination_tuples'], factor)
+        for i, factor in enumerate(tqdm(np.arange(**arange_args)), start=1):
+            modified_data = copy.deepcopy(original_data)
+            modified_services = modified_data.get('service')
+            assert modified_services, "No services found in the supply config."
+            for service in modified_services:
+                modify_prices(service['origin_destination_tuples'], factor)
 
-                modified_data['service'] = modified_services
-                supply_file_name = f"supply_{i}.yml"
-                save_path_supply = f"{self.tmp_path}/supply/{supply_file_name}"
+            modified_data['service'] = modified_services
+            supply_file_name = f"supply_{i}.yml"
+            save_path_supply = f"{self.tmp_path}/supply/{supply_file_name}"
 
-                with open(save_path_supply, 'w') as file:
-                    yaml.safe_dump(modified_data, file)
+            with open(save_path_supply, 'w') as file:
+                yaml.safe_dump(modified_data, file)
 
-                shutil.copy(self.path_config_demand, self.tmp_path / "demand" / f"demand_{i}.yml")
-                bar.update(i)
+            shutil.copy(self.path_config_demand, self.tmp_path / "demand" / f"demand_{i}.yml")
 
-    def simulate(self) -> None:
+    def simulate(self, runs: int = 1) -> None:
         """Simulate the experiment."""
 
         def file_number(file) -> int:
@@ -146,21 +142,25 @@ class RobinLab:
         # Run simulation for each supply file
         sorted_supply_files = sorted(os.listdir(self.tmp_path / "supply"), key=file_number)
         sorted_demand_files = sorted(os.listdir(self.tmp_path / "demand"), key=file_number)
-        with progressbar.ProgressBar(min_value=1, max_value=len(sorted_supply_files)) as bar:
-            for i, supply_file, demand_file in zip(range(1, len(sorted_supply_files)+1),
+        for r in tqdm(range(runs), desc="Runs: "):
+            seed = random.randint(0, 1000000)
+            print(f"Seed used run {r}: {seed}")
+            for i, supply_file, demand_file in zip(tqdm(range(1, len(sorted_supply_files) + 1),
+                                                        desc="Iters: ",
+                                                        leave=True),
                                                    sorted_supply_files,
                                                    sorted_demand_files):
                 kernel = Kernel(path_config_supply=self.tmp_path / "supply" / supply_file,
                                 path_config_demand=self.tmp_path / "demand" / demand_file,
-                                seed=self.seed)
-                kernel.simulate(output_path=Path(f"{self.tmp_path}/output/output_{i}.csv"))
-                bar.update(i)
+                                seed=seed)
+                kernel.simulate(output_path=Path(f"{self.tmp_path}/output/output_{r}_{i}.csv"),
+                                calculate_global_utility=True)
 
     def _get_tickets_sold(self) -> Mapping:
         """Get the number of tickets sold for each supply file."""
         tickets_sold = {}
-        for output_file in sorted(os.listdir(self.tmp_path / "output"),
-                                  key=lambda x: int(x.split(".")[0].split("_")[-1])):
+        output_files = sorted(os.listdir(self.tmp_path / "output"), key=lambda x: int(x.split(".")[0].split("_")[-1]))
+        for _, output_file in zip(tqdm(range(1, len(output_files) + 1)), output_files):
             df = pd.read_csv(self.tmp_path / "output" / output_file)
             buffer_tickets_sold = df.groupby(by=['seat']).size().to_dict()
             buffer_tickets_sold['Total'] = sum(buffer_tickets_sold.values())
@@ -240,20 +240,17 @@ class RobinLab:
         demand_files = sorted(os.listdir(self.tmp_path / "demand"), key=file_number)
 
         passenger_status = {}
-        with progressbar.ProgressBar(min_value=1, max_value=len(output_files)) as bar:
-            for i, supply_file, demand_file, output_file in zip(range(1, len(output_files) + 1),
-                                                                supply_files,
-                                                                demand_files,
-                                                                output_files):
+        for i, supply_file, demand_file, output_file in zip(tqdm(range(1, len(output_files) + 1)),
+                                                            supply_files,
+                                                            demand_files,
+                                                            output_files):
+            output = pd.read_csv(self.tmp_path / "output" / output_file,
+                                 dtype={'departure_station': str, 'arrival_station': str})
+            output["purchase_date"] = output.apply(
+                lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
+            )
 
-                output = pd.read_csv(self.tmp_path / "output" / output_file,
-                                     dtype={'departure_station': str, 'arrival_station': str})
-                output["purchase_date"] = output.apply(
-                    lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
-                )
-
-                passenger_status[i] = get_passenger_status(output)
-                bar.update(i)
+            passenger_status[i] = get_passenger_status(output)
 
         return passenger_status
 
@@ -305,55 +302,142 @@ class RobinLab:
 
         tickets_by_pair_seat = {}
         pairs_sold = {}
-        with progressbar.ProgressBar(min_value=1, max_value=len(output_files)) as bar:
-            for i, supply_file, demand_file, output_file in zip(range(1, len(output_files)+1),
-                                                                supply_files,
-                                                                demand_files,
-                                                                output_files):
+        for i, supply_file, demand_file, output_file in zip(tqdm(range(1, len(output_files) + 1)),
+                                                            supply_files,
+                                                            demand_files,
+                                                            output_files):
+            output = pd.read_csv(self.tmp_path / "output" / output_file,
+                                 dtype={'departure_station': str, 'arrival_station': str})
+            output["purchase_date"] = output.apply(
+                lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
+            )
 
-                output = pd.read_csv(self.tmp_path / "output" / output_file,
-                                     dtype={'departure_station': str, 'arrival_station': str})
-                output["purchase_date"] = output.apply(
-                    lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
-                )
-
-                tickets_by_pair_seat[i] = get_tickets_by_pair_seat(output, self.stations_dict)
-                pairs_sold[i] = get_pairs_sold(output, self.stations_dict)
-                bar.update(i)
+            tickets_by_pair_seat[i] = get_tickets_by_pair_seat(output, self.stations_dict)
+            pairs_sold[i] = get_pairs_sold(output, self.stations_dict)
 
         return tickets_by_pair_seat
 
-    def get_kpis(self):
-        file_number = lambda file: int(Path(file).stem.split("_")[-1])
-        output_files = sorted(os.listdir(self.tmp_path / "output"), key=file_number)
-        supply_files = sorted(os.listdir(self.tmp_path / "supply"), key=file_number)
-        demand_files = sorted(os.listdir(self.tmp_path / "demand"), key=file_number)
+    def get_markets_df(self, output_files: List[str]):
+        """
+        Get the dataframe for the markets plot.
 
-        passenger_status = {}
-        tickets_by_seat = {}
-        tickets_by_date_seat = {}
-        tickets_by_date_user_seat = {}
-        tickets_by_pair_seat = {}
-        pairs_sold = {}
-        with progressbar.ProgressBar(min_value=1, max_value=len(output_files)) as bar:
-            for i, supply_file, demand_file, output_file in zip(range(1, len(output_files)+1),
-                                                                supply_files,
-                                                                demand_files,
-                                                                output_files):
-                # supply = Supply.from_yaml(supply_file)
-                # demand = Demand.from_yaml(demand_file)
-                output = pd.read_csv(self.tmp_path / "output" / output_file,
-                                     dtype={'departure_station': str, 'arrival_station': str})
-                output["purchase_date"] = output.apply(
-                    lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
-                )
+        Args:
+            output_files (List[str]): List of output files.
 
-                passenger_status[i] = get_passenger_status(output)
-                # tickets_by_seat[i] = get_tickets_by_seat(output)
-                # tickets_by_date_seat[i] = get_tickets_by_date_seat(output)
-                tickets_by_date_user_seat[i] = get_tickets_by_date_user_seat(output)
-                tickets_by_pair_seat[i] = get_tickets_by_pair_seat(output, self.stations_dict)
-                pairs_sold[i] = get_pairs_sold(output, self.stations_dict)
-                bar.update(i)
+        Returns:
+            pd.DataFrame: Dataframe for the markets plot.
+        """
+        df_markets = pd.DataFrame(columns=['run', 'iter', 'tickets_sold', 'trip'])
 
-        return passenger_status, tickets_by_date_user_seat, tickets_by_pair_seat
+        for i, output_file in zip(tqdm(range(1, len(output_files) + 1)), output_files):
+            run, iter_num = get_file_key(output_file)
+            output = pd.read_csv(self.tmp_path / "output" / output_file,
+                                 dtype={'departure_station': str, 'arrival_station': str})
+            output["purchase_date"] = output.apply(
+                lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
+            )
+
+            tickets_by_pair_seat = get_tickets_by_pair_seat(output, self.stations_dict)
+            total_by_trip = {}
+            for seat in tickets_by_pair_seat:
+                for trip in tickets_by_pair_seat[seat]:
+                    if trip not in total_by_trip:
+                        total_by_trip[trip] = 0
+                    total_by_trip[trip] += tickets_by_pair_seat[seat][trip]
+
+            pairs_sold = get_pairs_sold(output, self.stations_dict)
+            for trip in pairs_sold:
+                df_m_row = [run, iter_num, pairs_sold[trip], trip]
+                df_markets.loc[len(df_markets)] = df_m_row
+
+        return df_markets
+
+    def get_tickets_seat_df(self, output_files: List[str]):
+        """
+        Get the dataframe for the tickets seat plot.
+
+        Args:
+            output_files (List[str]): List of output files.
+
+        Returns:
+            pd.DataFrame: Dataframe for the tickets seat plot.
+        """
+        df_tickets_seat = pd.DataFrame(columns=['run', 'iter', 'tickets_sold', 'seat_type'])
+
+        for i, output_file in zip(tqdm(range(1, len(output_files) + 1)), output_files):
+            run, iter_num = get_file_key(output_file)
+            output = pd.read_csv(self.tmp_path / "output" / output_file,
+                                 dtype={'departure_station': str, 'arrival_station': str})
+            output["purchase_date"] = output.apply(
+                lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
+            )
+
+            tickets_by_date_user_seat = get_tickets_by_date_user_seat(output)
+
+            total_by_seat = {}
+            for purchase_date in tickets_by_date_user_seat:
+                for user in tickets_by_date_user_seat[purchase_date]:
+                    for seat in tickets_by_date_user_seat[purchase_date][user]:
+                        if seat not in total_by_seat:
+                            total_by_seat[seat] = 0
+                        total_by_seat[seat] += tickets_by_date_user_seat[purchase_date][user][seat]
+
+            total_by_seat['Total'] = sum(total_by_seat.values())
+            for seat in total_by_seat:
+                df_ts_row = [run, iter_num, total_by_seat[seat], seat]
+                df_tickets_seat.loc[len(df_tickets_seat)] = df_ts_row
+
+        return df_tickets_seat
+
+    def get_demand_status_df(self, output_files: List[str]):
+        """
+        Get the dataframe for the demand status plot.
+
+        Args:
+            output_files (List[str]): List of output files.
+
+        Returns:
+            pd.DataFrame: Dataframe for the demand status plot.
+        """
+        df_demand_status = pd.DataFrame(columns=['run', 'iter', 'users', 'status'])
+
+        for i, output_file in zip(tqdm(range(1, len(output_files) + 1)), output_files):
+            run, iter_num = get_file_key(output_file)
+            output = pd.read_csv(self.tmp_path / "output" / output_file,
+                                 dtype={'departure_station': str, 'arrival_station': str})
+            output["purchase_date"] = output.apply(
+                lambda row: get_purchase_date(row['purchase_day'], row['arrival_day']), axis=1
+            )
+
+            demand_status_dict, labels = get_passenger_status(output)
+            for k, v in demand_status_dict.items():
+                df_ds_row = [run, iter_num, v, labels[k]]
+                df_demand_status.loc[len(df_demand_status)] = df_ds_row
+
+        return df_demand_status
+
+    def get_sns_dfs(self):
+        """
+        Get the dataframes for seaborn plots.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Dataframes for seaborn plots.
+        """
+        output_files = sorted(os.listdir(self.tmp_path / "output"), key=get_file_key)
+
+        df_markets = self.get_markets_df(output_files=output_files)
+        df_tickets_seat = self.get_tickets_seat_df(output_files=output_files)
+        df_demand_status = self.get_demand_status_df(output_files=output_files)
+
+        return df_markets, df_tickets_seat, df_demand_status
+
+    def set_seed(self, seed: int) -> None:
+        """
+        Set seed for the random number generator.
+
+        Args:
+            seed (int): Seed for the random number generator.
+        """
+        random.seed(seed)
+        np.random.seed(seed)
+        os.environ['PYTHONHASHSEED'] = str(seed)
