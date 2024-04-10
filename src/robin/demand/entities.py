@@ -84,21 +84,14 @@ class UserPattern:
         name(str): The user pattern name.
         behaviour_rules (List[Mapping]): The rules of the behaviour model.
         behaviour_variables (List[Mapping]): The variables of the behaviour model.
-        arrival_time (Callable): The arrival time distribution function.
         arrival_time_kwargs (Mapping[str, Union[int, float]]): The arrival time distribution parameters.
-        purchase_day (Callable): The purchase day distribution function.
         purchase_day_kwargs (Mapping[str, Union[int, float]]): The purchase day distribution named parameters.
         forbidden_departure_hours (Tuple[int, int]): The forbidden departure hours.
         seats (Mapping[int, float]): The utility of the seats.
-        penalty_arrival_time (Callable): The penalty function for the arrival time.
         penalty_arrival_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-        penalty_departure_time (Callable): The penalty function for the departure time.
         penalty_departure_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-        penalty_cost (Callable): The penalty function for the cost.
         penalty_cost_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-        penalty_travel_time (Callable): The penalty function for the travel time.
         penalty_travel_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-        error (Callable): The error distribution function.
         error_kwargs (Mapping[str, Union[int, float]]): The error distribution named parameters.
         default_seat_utility (float): The default utility of the seats.
         default_rvs_size (int): The default size of the random variables sample.
@@ -210,7 +203,8 @@ class UserPattern:
         self.default_tsp_utility = default_tsp_utility
         self.default_rvs_size = default_rvs_size
 
-    def _check_forbidden_departure_hours(self, forbidden_departure_hours: Tuple[int, int]) -> Tuple[int, int]:
+    @staticmethod
+    def _check_forbidden_departure_hours(forbidden_departure_hours: Tuple[int, int]) -> Tuple[int, int]:
         """
         Checks if the given forbidden departure hours are valid.
 
@@ -686,66 +680,6 @@ class Passenger:
         is_valid_departure_time_later = service_departure_time <= forbidden_departure_hours[1]
         return not (is_valid_departure_time_early and is_valid_departure_time_later)
 
-    def _get_utility_arrival_time(self, service_arrival_time: float) -> float:
-        """
-        Returns the utility of the passenger given the arrival time.
-
-        Args:
-            service_arrival_time (float): The arrival time of the service.
-
-        Returns:
-            float: The utility of the passenger given the arrival time.
-        """
-        # NOTE: Speed up the arrival time utility by avoiding using max function.
-        # earlier_displacement = max(self.arrival_time - service_arrival_time, 0)
-        # later_displacement = max(service_arrival_time - self.arrival_time, 0)
-        earlier_displacement = self.arrival_time - service_arrival_time if self.arrival_time > service_arrival_time else 0
-        later_displacement = service_arrival_time - self.arrival_time if self.arrival_time < service_arrival_time else 0
-        return self.user_pattern.penalty_arrival_time(earlier_displacement + later_displacement)
-
-    def _get_utility_departure_time(self, service_departure_time: float) -> float:
-        """
-        Returns the utility of the passenger given the departure time.
-
-        Args:
-            service_departure_time (float): The departure time of the service.
-
-        Returns:
-            float: The utility of the passenger given the departure time.
-        """
-        dt_begin = self.user_pattern.forbidden_departure_hours[0]
-        dt_end = self.user_pattern.forbidden_departure_hours[1]
-        # NOTE: Speed up the departure time utility by avoiding using min and max functions.
-        # departure_time = min(max(dt_end - service_departure_time, 0), dt_end - dt_begin)
-        _departure_time = dt_end - service_departure_time if dt_end > service_departure_time else 0
-        departure_time = _departure_time if _departure_time < dt_end - dt_begin else dt_end - dt_begin
-        return self.user_pattern.penalty_departure_time(departure_time)
-
-    def _get_utility_price(self, price: float) -> float:
-        """
-        Returns the utility of the passenger given the price.
-
-        Args:
-            price (float): The price of the service.
-
-        Returns:
-            float: The utility of the passenger given the price.
-        """
-        return self.user_pattern.penalty_cost(price)
-
-    def _get_utility_travel_time(self, service_arrival_time: float, service_departure_time: float) -> float:
-        """
-        Returns the utility of the passenger given the travel time.
-
-        Args:
-            service_arrival_time (float): The arrival time of the service.
-            service_departure_time (float): The departure time of the service.
-
-        Returns:
-            float: The utility of the passenger given the travel time.
-        """
-        return self.user_pattern.penalty_travel_time(service_arrival_time - service_departure_time)
-
     def behaviour_inference(self, input_values: List) -> Mapping:
         """
         Returns the behaviour inference of the passenger given the input values.
@@ -810,41 +744,6 @@ class Passenger:
         service_vars = [service_vars[var] for var in user_var_names]
 
         return self.behaviour_inference(service_vars)["Output"]
-
-    def get_utility(
-            self,
-            seat: int,
-            tsp: int,
-            service_departure_time: float,
-            service_arrival_time: float,
-            price: float,
-            departure_time_hard_restriction: bool = False
-        ) -> float:
-        """
-        Returns the utility of the passenger given the seat, the arrival time, the departure time and the price.
-
-        Args:
-            seat (int): The seat of the service.
-            tsp (int): The train service provider of the service.
-            service_departure_time (float): The departure time of the service.
-            service_arrival_time (float): The arrival time of the service.
-            price (float): The price of the seat.
-            departure_time_hard_restriction (bool, optional): If True, the passenger will not be
-                assigned to a service with a departure time that is not valid. Defaults to False.
-        
-        Returns:
-            float: The utility of the passenger given the seat, the arrival time, the departure time and the price.
-        """
-        if departure_time_hard_restriction and not self._is_valid_departure_time(service_departure_time):
-            return -np.inf  # Minimum utility
-        seat_utility = self.user_pattern.get_seat_utility(seat)
-        tsp_utility = self.user_pattern.get_tsp_utility(tsp)
-        arrival_time_utility = self._get_utility_arrival_time(service_arrival_time)
-        departure_time_utility = self._get_utility_departure_time(service_departure_time)
-        price_utility = self._get_utility_price(price)
-        travel_time_utility = self._get_utility_travel_time(service_arrival_time, service_departure_time)
-        error_utility = self.user_pattern.error
-        return seat_utility + tsp_utility - arrival_time_utility - departure_time_utility - price_utility - travel_time_utility + error_utility
 
     def __str__(self) -> str:
         """
