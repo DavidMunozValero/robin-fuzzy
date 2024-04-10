@@ -40,7 +40,7 @@ class KernelPlotter:
         )
 
         # print(plt.style.available)
-        plt.style.use('seaborn-v0_8-poster')
+        # plt.style.use('seaborn-v0_8-poster')
         self.colors = ['lemonchiffon', 'lightsteelblue', 'palegreen', 'lightsalmon', 'lavender', 'lightgray']
         self.stations_dict = self.supply.get_stations_dict()
         locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
@@ -433,6 +433,34 @@ class KernelPlotter:
         ax.set_title('Seat types distribution', fontweight='bold')
         ax.pie(tickets_sold_by_seat.values(), labels=tickets_sold_by_seat.keys(), colors=colors, autopct='%1.1f%%')
         ax.legend(bbox_to_anchor=(0.2, 0.2))
+        plt.show()
+
+        if save_path is not None:
+            fig.savefig(save_path, format='pdf', dpi=300, bbox_inches='tight', transparent=True)
+
+    def plot_users_seat_pie_chart(self, save_path: str = None):
+        data = get_tickets_by_date_user_seat(self.df)
+        dict_user_seat = {}
+        for date in data:
+            for user_type in data[date]:
+                if user_type not in dict_user_seat:
+                    dict_user_seat[user_type] = {}
+                for seat in data[date][user_type]:
+                    if seat not in dict_user_seat[user_type]:
+                        dict_user_seat[user_type][seat] = data[date][user_type][seat]
+                    else:
+                        dict_user_seat[user_type][seat] += data[date][user_type][seat]
+
+        print(dict_user_seat)
+        fig, axs = plt.subplots(len(dict_user_seat.keys()), 1, figsize=(7, 4 * len(dict_user_seat.keys())))
+        fig.subplots_adjust(hspace=0.75, bottom=0.2, top=0.9)
+
+        for i, user_type in enumerate(dict_user_seat.keys()):
+            ax = axs[i]
+            ax.set_title(f'Seat distribution for {user_type} users', fontweight='bold')
+            colors = [self.colors[i % len(self.colors)] for i, _ in enumerate(dict_user_seat[user_type].keys())]
+            ax.pie(dict_user_seat[user_type].values(), labels=dict_user_seat[user_type].keys(), colors=colors, autopct='%1.1f%%')
+            ax.legend(bbox_to_anchor=(0.2, 0.2))
         plt.show()
 
         if save_path is not None:
