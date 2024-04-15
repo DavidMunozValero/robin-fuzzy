@@ -2,6 +2,7 @@
 
 import datetime
 import numpy as np
+import random
 import yaml
 
 from ..decision_model.fuzzy_model import AcumulativeTSKFuzzyModel
@@ -88,10 +89,6 @@ class UserPattern:
         purchase_day_kwargs (Mapping[str, Union[int, float]]): The purchase day distribution named parameters.
         forbidden_departure_hours (Tuple[int, int]): The forbidden departure hours.
         seats (Mapping[int, float]): The utility of the seats.
-        penalty_arrival_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-        penalty_departure_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-        penalty_cost_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-        penalty_travel_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
         error_kwargs (Mapping[str, Union[int, float]]): The error distribution named parameters.
         default_seat_utility (float): The default utility of the seats.
         default_rvs_size (int): The default size of the random variables sample.
@@ -117,14 +114,6 @@ class UserPattern:
             forbidden_departure_hours: Tuple[int, int],
             seats: Mapping[int, float],
             tsps: Mapping[int, float],
-            penalty_arrival_time: str,
-            penalty_arrival_time_kwargs: Mapping[str, Union[int, float]],
-            penalty_departure_time: str,
-            penalty_departure_time_kwargs: Mapping[str, Union[int, float]],
-            penalty_cost: str,
-            penalty_cost_kwargs: Mapping[str, Union[int, float]],
-            penalty_travel_time: str,
-            penalty_travel_time_kwargs: Mapping[str, Union[int, float]],
             error: str,
             error_kwargs: Mapping[str, Union[int, float]],
             default_seat_utility: float = DEFAULT_SEAT_UTILITY,
@@ -144,14 +133,6 @@ class UserPattern:
             forbidden_departure_hours (Tuple[int, int]): The forbidden departure hours.
             seats (Mapping[int, float]): The utility of the seats.
             tsps (Mapping[int, float]): The utility of the train service providers.
-            penalty_arrival_time (str): The penalty function name for the arrival time.
-            penalty_arrival_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-            penalty_departure_time (str): The penalty function name for the departure time.
-            penalty_departure_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-            penalty_cost (str): The penalty function name for the cost.
-            penalty_cost_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
-            penalty_travel_time (str): The penalty function name for the travel time.
-            penalty_travel_time_kwargs (Mapping[str, Union[int, float]]): The penalty function named parameters.
             error (str): The error distribution name.
             error_kwargs (Mapping[str, Union[int, float]]): The error distribution named parameters.
             default_seat_utility (float, optional): The default utility of the seats.
@@ -167,7 +148,7 @@ class UserPattern:
         """
         self.id = id
         self.name = name
-        self._rules = rules
+        self.rules = rules
         self._variables = variables
         self.behaviour_variables = get_variables_from_dict(variables)
         self.behaviour_rules = get_rules_from_dict(rules, self.behaviour_variables)
@@ -186,14 +167,7 @@ class UserPattern:
         )
         self.seats = seats
         self.tsps = tsps
-        self._penalty_arrival_time = get_function(function_name=penalty_arrival_time)
-        self.penalty_arrival_time_kwargs = list(penalty_arrival_time_kwargs.values())
-        self._penalty_departure_time = get_function(function_name=penalty_departure_time)
-        self.penalty_departure_time_kwargs = list(penalty_departure_time_kwargs.values())
-        self._penalty_cost = get_function(function_name=penalty_cost)
-        self.penalty_cost_kwargs = list(penalty_cost_kwargs.values())
-        self._penalty_travel_time = get_function(function_name=penalty_travel_time)
-        self.penalty_travel_time_kwargs = list(penalty_travel_time_kwargs.values())
+
         self._error, self.error_kwargs = get_scipy_distribution(
             distribution_name=error, is_discrete=False, **error_kwargs
         )
@@ -289,54 +263,6 @@ class UserPattern:
         """
         return self.tsps.get(tsp, self.default_tsp_utility)
     
-    def penalty_arrival_time(self, x: float) -> float:
-        """
-        Returns the value of the penalty function for the arrival time.
-
-        Args:
-            x (float): The arrival time.
-
-        Returns:
-            float: The penalty function value for the arrival time.
-        """
-        return self._penalty_arrival_time(x=x, coeff=self.penalty_arrival_time_kwargs)
-    
-    def penalty_departure_time(self, x: float) -> float:
-        """
-        Returns the value of the penalty function for the departure time.
-
-        Args:
-            x (float): The departure time.
-
-        Returns:
-            float: The penalty function value for the departure time.
-        """
-        return self._penalty_departure_time(x=x, coeff=self.penalty_departure_time_kwargs)
-    
-    def penalty_cost(self, x: float) -> float:
-        """
-        Returns the value of the penalty function for the cost.
-
-        Args:
-            x (float): The cost.
-
-        Returns:
-            float: The penalty function value for the cost.
-        """
-        return self._penalty_cost(x=x, coeff=self.penalty_cost_kwargs)
-    
-    def penalty_travel_time(self, x: float) -> float:
-        """
-        Returns the value of the penalty function for the travel time.
-
-        Args:
-            x (float): The travel time.
-
-        Returns:
-            float: The penalty function value for the travel time.
-        """
-        return self._penalty_travel_time(x=x, coeff=self.penalty_travel_time_kwargs)
-    
     @property
     def error(self) -> float:
         """
@@ -382,14 +308,6 @@ class UserPattern:
             f'purchase_day_kwargs={self.purchase_day_kwargs}, '
             f'forbidden_departure_hours={self.forbidden_departure_hours}, '
             f'seats={self.seats}, '
-            f'penalty_arrival_time={self._penalty_arrival_time}, '
-            f'penalty_arrival_time_kwargs={self.penalty_arrival_time_kwargs}, '
-            f'penalty_departure_time={self._penalty_departure_time}, '
-            f'penalty_departure_time_kwargs={self.penalty_departure_time_kwargs}, '
-            f'penalty_cost={self._penalty_cost}, '
-            f'penalty_cost_kwargs={self.penalty_cost_kwargs}, '
-            f'penalty_travel_time={self._penalty_travel_time}, '
-            f'penalty_travel_time_kwargs={self.penalty_travel_time_kwargs}, '
             f'error={self._error}, '
             f'error_kwargs={self.error_kwargs})'
         )
@@ -568,6 +486,28 @@ class Day:
         Returns:
             List[Passenger]: The generated passengers.
         """
+        def update_rules(values: list, max_change: int = 2):
+            for _ in range(len(values)):
+                # Set two random indexes
+                idx1, idx2 = random.sample(range(len(values)), 2)
+
+                # Calculate the amount of change
+                cambio = np.round(np.random.uniform(1, min(max_change, values[idx1], values[idx2])), 2)
+
+                # Adjust the values
+                values[idx1] = np.round(values[idx1] - cambio, 2)
+                values[idx2] = np.round(values[idx2] + cambio, 2)
+            return values
+
+        def passenger_custom_behaviour(rules):
+            values = [float(rule.split(' ')[-1]) for r, rule in rules.items()]
+            updated_values = update_rules(values)
+            updated_rules = {}
+            for i, r in enumerate(rules):
+                default_rule = rules[r]
+                updated_rules[r] = " ".join(default_rule.split(' ')[:-1]) + f" {updated_values[i]}"
+            return updated_rules
+
         passengers = []
         for market in self.demand_pattern.markets:
             potential_demand = self.demand_pattern.potential_demand(market)
