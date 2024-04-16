@@ -49,6 +49,7 @@ class Kernel:
             'arrival_day', 'arrival_time', 'purchase_day', 'service', 'service_departure_time',
             'service_arrival_time', 'seat', 'price', 'utility', 'best_service', 'best_seat', 'best_utility'
         ]
+
         data = []
         for passenger in passengers:
             data.append([
@@ -72,10 +73,20 @@ class Kernel:
         df = pd.DataFrame(data=data, columns=column_names)
         df.to_csv(output_path, index=False)
 
+        utilities_df = pd.DataFrame()
+        for passenger in passengers:
+            passenger_data = passenger.utility_history
+            passenger_data['id'] = passenger.id
+            passenger_data['user_pattern'] = passenger.user_pattern
+            passenger_row = pd.DataFrame([passenger_data])
+            utilities_df = pd.concat([utilities_df, passenger_row], ignore_index=True)
+
+        utilities_df.to_csv(output_path.parent / 'utilities.csv', index=False)
+
     def simulate(
             self,
             output_path: Union[Path, None] = None,
-            departure_time_hard_restriction: bool = True
+            departure_time_hard_restriction: bool = False
         ) -> List[Service]:
         """
         Simulate the demand-supply interaction.
@@ -122,6 +133,7 @@ class Kernel:
             seat_arg_max_global = 0
             seat_utility_global = 0
 
+            passenger_row = {}
             for service in services:
                 for seat in service.prices.get((origin, destination), {}).keys():
                     # Calculate utility
@@ -130,6 +142,8 @@ class Kernel:
                         service=service,
                         departure_time_hard_restriction=departure_time_hard_restriction
                     )
+
+                    passenger.utility_history[(service.id, seat.id)] = utility
                     # Update global utility
                     if utility > seat_utility_global:
                         service_arg_max_global = service
