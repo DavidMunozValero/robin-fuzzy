@@ -486,7 +486,17 @@ class Day:
         Returns:
             List[Passenger]: The generated passengers.
         """
-        def update_rules(values: list, max_change: int = 2):
+        def update_rules_consequent(values: list, max_change: int = 2):
+            """
+            Randomly updates the values of the rules. The sum of the values is preserved.
+
+            Args:
+                values (list): The values of the rules.
+                max_change (int): The maximum change allowed.
+
+            Returns:
+                list: The updated values of the rules.
+            """
             for _ in range(len(values)):
                 # Set two random indexes
                 idx1, idx2 = random.sample(range(len(values)), 2)
@@ -499,9 +509,18 @@ class Day:
                 values[idx2] = np.round(values[idx2] + cambio, 2)
             return values
 
-        def passenger_custom_behaviour(rules):
+        def passenger_custom_behaviour(rules: Mapping[str, str]):
+            """
+            Updates the rules of the passenger behaviour model.
+
+            Args:
+                rules (Mapping[str, str]): The rules of the passenger behaviour model.
+
+            Returns:
+                Mapping[str, str]: The updated rules of the passenger behaviour model.
+            """
             values = [float(rule.split(' ')[-1]) for r, rule in rules.items()]
-            updated_values = update_rules(values)
+            updated_values = update_rules_consequent(values)
             updated_rules = {}
             for i, r in enumerate(rules):
                 default_rule = rules[r]
@@ -513,11 +532,13 @@ class Day:
             potential_demand = self.demand_pattern.potential_demand(market)
             for i in range(potential_demand):
                 user_pattern = self.demand_pattern.get_user_pattern(market)
+
                 # Slightly randomize user pattern attributes
                 passengers.append(
                     Passenger(
                         id=i + id_offset,
                         user_pattern=user_pattern,
+                        passenger_rules=passenger_custom_behaviour(user_pattern.rules),
                         market=market,
                         arrival_day=self,
                         arrival_time=user_pattern.arrival_time,
@@ -572,6 +593,7 @@ class Passenger:
             self,
             id: int,
             user_pattern: UserPattern,
+            passenger_rules: Mapping[str, str],
             market: Market,
             arrival_day: Day,
             arrival_time: float,
@@ -594,13 +616,15 @@ class Passenger:
         self.arrival_day = arrival_day
         self.arrival_time = arrival_time
         self.purchase_day = purchase_day
-        self.behaviour_model = AcumulativeTSKFuzzyModel(self.user_pattern.behaviour_rules)
+        behaviour_rules = get_rules_from_dict(passenger_rules, user_pattern.behaviour_variables)
+        self.behaviour_model = AcumulativeTSKFuzzyModel(behaviour_rules)
         self.service = None
         self.service_departure_time = None
         self.service_arrival_time = None
         self.seat = None
         self.ticket_price = None
         self.utility = None
+        self.utility_history = {}
         self.best_service = None
         self.best_seat = None
         self.best_utility = None
@@ -632,7 +656,7 @@ class Passenger:
 
         Output example: {'Input': [1.0, 50.0, 40.0, 50.0],
                          'actives_rules': ['R0', 'R2'],
-                         'consequents_values_list': [35.0, 15.0],
+                         'consequent_values_list': [35.0, 15.0],
                          'rule_membership_value_list': [1, 0.5],
                          'Output': 42.5}
         """
