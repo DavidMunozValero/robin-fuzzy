@@ -143,7 +143,11 @@ class Kernel:
                         departure_time_hard_restriction=departure_time_hard_restriction
                     )
 
-                    passenger.utility_history[(service.id, seat.id)] = utility
+                    passenger.utility_history[(service.id, seat.id)] = {'service': service,
+                                                                        'seat': seat,
+                                                                        'price': service.prices[(origin, destination)][seat],
+                                                                        'utility': utility}
+
                     # Update global utility
                     if utility > seat_utility_global:
                         service_arg_max_global = service
@@ -162,8 +166,16 @@ class Kernel:
                         seat_utility = utility
                         ticket_price = service.prices[(origin, destination)][seat]
 
-            # Buy ticket if utility is positive
-            if seat_utility > 0:
+            if passenger.early_stop:
+                for i, key in enumerate(passenger.utility_history.keys()):
+                    if passenger.utility_history[key]['utility'] >= passenger.user_pattern.utility_threshold:
+                        service_arg_max = passenger.utility_history[key]['service']
+                        seat_arg_max = passenger.utility_history[key]['seat']
+                        ticket_price = passenger.utility_history[key]['price']
+                        seat_utility = passenger.utility_history[key]['utility']
+
+            # Buy ticket if utility is greater than threshold
+            if seat_utility > passenger.user_pattern.utility_threshold:
                 assert service_arg_max is not None
                 assert seat_arg_max is not None
                 ticket_bought = service_arg_max.buy_ticket(
