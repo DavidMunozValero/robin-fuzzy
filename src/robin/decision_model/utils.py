@@ -17,6 +17,7 @@ def read_json_variables(file_name, var_names):
             d['type'] = var['type']
             if d["type"] == "categorical":
                 d['labels'] = var['labels'][0:]
+                d['position'] = var_names.index(d['name'])
             elif d["type"] == "fuzzy":
                 d['position'] = var_names.index(d['name'])
                 d['support'] = var['support']
@@ -129,7 +130,6 @@ def get_rules_from_dict(data: Mapping[str, str],
         antecedent, consequent = rule.split(' THEN ')
         consequent = float(consequent)
         lista = generaLista(antecedent, ['(', ')', '&', '|'], '(', ')', variables)
-
         r = TSKRule(name,
                     PDC(lista, funciones),  # antedente
                     lambda cons=consequent: cons)
@@ -155,6 +155,7 @@ def get_variables_from_dict(data: List[Mapping]) -> Mapping[str, MembershipFS]:
         d['type'] = var['type']
         if d["type"] == "categorical":
             d['labels'] = var['labels'][0:]
+            d['position'] = var_names.index(d['name'])
         elif d["type"] == "fuzzy":
             d['position'] = var_names.index(d['name'])
             d['support'] = var['support']
