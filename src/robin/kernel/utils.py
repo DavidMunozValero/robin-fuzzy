@@ -1,4 +1,5 @@
 from ..demand.entities import Passenger
+from ..decision_model.propositions import PDC
 
 
 def get_constrain_value(passenger: Passenger,
@@ -16,7 +17,14 @@ def get_constrain_value(passenger: Passenger,
     """
     max_value = 1.0
     for rule in passenger.user_pattern.behaviour_rules:
+        # TODO: Recursive
         for proposition in rule.antecedent.proposiciones:
-            if proposition.variable.name == variable_name:
+            if type(proposition) is PDC:
+                for prop in proposition.proposiciones:
+                    if prop.variable.name == variable_name:
+                        max_value = max(prop.term.values)
+
+            elif proposition.variable.name == variable_name:
                 max_value = max(proposition.term.values)
+
     return max_value
