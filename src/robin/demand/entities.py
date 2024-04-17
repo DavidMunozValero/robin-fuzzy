@@ -89,6 +89,8 @@ class UserPattern:
         purchase_day_kwargs (Mapping[str, Union[int, float]]): The purchase day distribution named parameters.
         forbidden_departure_hours (Tuple[int, int]): The forbidden departure hours.
         seats (Mapping[int, float]): The utility of the seats.
+        early_stop (float): Probability of early stop.
+        utility_threshold (float): The utility threshold.
         error_kwargs (Mapping[str, Union[int, float]]): The error distribution named parameters.
         default_seat_utility (float): The default utility of the seats.
         default_rvs_size (int): The default size of the random variables sample.
@@ -114,6 +116,8 @@ class UserPattern:
             forbidden_departure_hours: Tuple[int, int],
             seats: Mapping[int, float],
             tsps: Mapping[int, float],
+            early_stop: float,
+            utility_threshold: float,
             error: str,
             error_kwargs: Mapping[str, Union[int, float]],
             default_seat_utility: float = DEFAULT_SEAT_UTILITY,
@@ -168,6 +172,8 @@ class UserPattern:
         self.seats = seats
         self.tsps = tsps
 
+        self.early_stop = early_stop
+        self.utility_threshold = utility_threshold
         self._error, self.error_kwargs = get_scipy_distribution(
             distribution_name=error, is_discrete=False, **error_kwargs
         )
@@ -532,8 +538,6 @@ class Day:
             potential_demand = self.demand_pattern.potential_demand(market)
             for i in range(potential_demand):
                 user_pattern = self.demand_pattern.get_user_pattern(market)
-
-                # Slightly randomize user pattern attributes
                 passengers.append(
                     Passenger(
                         id=i + id_offset,
@@ -618,6 +622,7 @@ class Passenger:
         self.purchase_day = purchase_day
         behaviour_rules = get_rules_from_dict(passenger_rules, user_pattern.behaviour_variables)
         self.behaviour_model = AcumulativeTSKFuzzyModel(behaviour_rules)
+        self.early_stop = np.random.normal() < user_pattern.early_stop
         self.service = None
         self.service_departure_time = None
         self.service_arrival_time = None
@@ -700,9 +705,9 @@ class Passenger:
                         'destination': distance_to_destination,
                         'departure_time': service_departure_time,
                         'arrival_time': service_arrival_time,
-                        'seat': int(seat.id),
+                        'seat': seat.name,
                         'price': price,
-                        'tsp': int(service.tsp.id)}
+                        'tsp': service.tsp.name}
 
         user_var_names = tuple(self.user_pattern.behaviour_variables.keys())
         service_vars = [service_vars[var] for var in user_var_names]
