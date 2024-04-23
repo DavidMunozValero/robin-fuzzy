@@ -66,7 +66,8 @@ def _tree_to_yaml(dict_tree: Dict[Station, Dict]) -> List[Dict]:
         return [{'org': node, 'des': _tree_to_yaml(dict_tree[node])} for node in dict_tree]
 
 
-def build_service(date: datetime.date,
+def build_service(id_: str,
+                  date: datetime.date,
                   line: Line,
                   time_slot: TimeSlot,
                   tsp: TSP,
@@ -77,6 +78,7 @@ def build_service(date: datetime.date,
     Build service object from parameters
 
     Args:
+        id_ (str): ID of the service
         date (datetime.date): Date of the service
         line (Line): Line of the service
         time_slot (TimeSlot): Time slot of the service
@@ -89,7 +91,7 @@ def build_service(date: datetime.date,
     """
     date_str = date.strftime('%Y-%m-%d')
     time_str = ".".join(str(time_slot.start).split(":")[:2])
-    return Service(id_=f'{line.id}_{date_str}-{time_str}',
+    return Service(id_=f'{id_}_{date_str}-{time_str}',
                    date=date,
                    line=line,
                    time_slot=time_slot,

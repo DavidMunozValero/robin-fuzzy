@@ -80,8 +80,8 @@ class ServiceGenerator:
         self._set_config(path_config)
 
         services = []
-        for _ in range(n_services):
-            services.append(self._generate_service())
+        for i in range(n_services):
+            services.append(self._generate_service(id_=str(i)))
 
         self.services += services
         self.save_to_yaml(services, file_name)
@@ -112,7 +112,7 @@ class ServiceGenerator:
 
         self._write_to_yaml(file_name, yaml_dict)
 
-    def _generate_service(self) -> Service:
+    def _generate_service(self, id_: str) -> Service:
         """
         Generate a random service
 
@@ -125,7 +125,7 @@ class ServiceGenerator:
         rs = self._get_random_rs(tsp)
         date = self._get_random_date()
         prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
-        service = build_service(date, line, time_slot, tsp, rs, prices)
+        service = build_service(id_=id_, date=date, line=line, time_slot=time_slot, tsp=tsp, rs=rs, prices=prices)
 
         self.services.append(service)
         return service
@@ -160,7 +160,8 @@ class ServiceGenerator:
         Returns:
             TSP: TSP object randomly selected from the available TSPs
         """
-        return random.choice(list(self.tsps.values()))
+        tsp_probabilities = self.config['tsps']['probabilities']
+        return random.choices(list(self.tsps.values()), weights=list(tsp_probabilities.values()))[0]
 
     def _get_random_date(self) -> datetime.date:
         """
