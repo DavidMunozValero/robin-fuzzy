@@ -7,7 +7,7 @@ from .variables import Variable, RealV, CategoryV, LinguisticV
 from .terms import Term, RealT, CategoryT, MembershipFS
 
 
-class AtomicProposition:
+class AtomicProposition():
     """ Clase para modelar una proposición atómica
 
         Esta clase modela las proposiciones atómicas, por ejemplo:
@@ -15,9 +15,10 @@ class AtomicProposition:
 
         Attributes:
             antecedent(LinguisticV): Variable Lingüística de la PDA.
-            CL (CL): término primario de la PDA.  
+            CL (CL): término primario de la PDA.
     """
-    def __init__(self, variable:Variable, term:Term):
+
+    def __init__(self, variable: Variable, term: Term):
         self.variable = variable
         self.term = term
 
@@ -44,9 +45,8 @@ class AtomicProposition:
         """
         return self.term
 
-
     # GETTERS
-    def set_variable(self, variable:Variable) -> None:
+    def set_variable(self, variable: Variable) -> None:
         """Devuelve la variable.
 
         Args:
@@ -57,7 +57,7 @@ class AtomicProposition:
         """
         self.variable = variable
 
-    def set_term(self, term:Term) -> None:
+    def set_term(self, term: Term) -> None:
         """Devuelve el término independiente.
 
         Args:
@@ -70,32 +70,32 @@ class AtomicProposition:
 
 
 class CompoundProposition():
-    """ Clase para modelar una proposición compuesta. 
+    """ Clase para modelar una proposición compuesta.
 
-    Se modela con dos listas: (1) la primera tiene como componentes objetos AP 
+    Se modela con dos listas: (1) la primera tiene como componentes objetos AP
     y/o CP, (2) La segunda tiene conectivas implementadas como funciones (Callable)
 
         Attributes:
             proposiciones (list): Lista con las proposiciones que componen la PDC.
-            conectivas (list[Callable]): conectivas entre las PDAs que componen el 
+            conectivas (list[Callable]): conectivas entre las PDAs que componen el
             atributo "proposiciones". Tendrá una longitud un elemento inferior al
-            atributo "proposiciones". 
+            atributo "proposiciones".
     """
-    def __init__(self, propos:list, functions:dict ):
+
+    def __init__(self, propos: list, functions: dict):
         # Creación de las proposiciones a partir de "propos"
         self.proposiciones = []
         # Creación de las conectivas a partir de "propos" y funciones
         self.conectivas_texto = []
         self.conectivas_funcion = []
 
-
     # GETTERS
-    def get_proposicion(self, pos:int) -> AtomicProposition:
+    def get_proposicion(self, pos: int) -> AtomicProposition:
         """Devuelve la variable de la proposición.
 
         Args:
             pos(int): posición de la proposición a recuperar.
-        
+
         Returns:
             PDA.
         """
@@ -106,13 +106,13 @@ class CompoundProposition():
 
         Args:
             None
-        
+
         Returns:
             int.
         """
         return len(self.proposiciones)
 
-    def get_conectiva_texto(self, pos:int) -> str:
+    def get_conectiva_texto(self, pos: int) -> str:
         """Devuelve la t_norma/t_conorma como texto entre las proposiciones difusas
         en las posiciones pos-1 y pos+1.
 
@@ -124,7 +124,7 @@ class CompoundProposition():
         """
         return self.conectivas_texto[pos]
 
-    def get_conectiva_funcion(self, pos:int) -> Callable:
+    def get_conectiva_funcion(self, pos: int) -> Callable:
         """Devuelve el t_norma/t_conorma a utilizar entre las proposiciones difusas
         en las posiciones pos-1 y pos+1.
 
@@ -145,18 +145,17 @@ class RealAP(AtomicProposition):
 
         Attributes:
             variable(RealV): Variable real de la RealAP.
-            term (RealT): término primario de la RealAP.  
+            term (RealT): término primario de la RealAP.
     """
-    def __init__(self, variable:RealV, term:RealT):
-        AtomicProposition.__init__(self, variable, term)
 
+    def __init__(self, variable: RealV, term: RealT):
+        AtomicProposition.__init__(self, variable, term)
 
     # GETTERS
 
-
     # FUNCIONES PROPIAS
-    def membership_grade(self, value:float) -> float:
-        """Devuelve el valor de pertenencia de "value" al termino primario 
+    def membership_grade(self, value: float, trace=False) -> float:
+        """Devuelve el valor de pertenencia de "value" al termino primario
         (valor real).
 
         Args:
@@ -165,10 +164,20 @@ class RealAP(AtomicProposition):
         Returns:
             float: valor de pertenencia
         """
-        if round(value,8) == round( float(self.get_term().get_real()), 8):
-            return 1.0
-        return 0.0
-
+        dicc = {}
+        if trace:
+            dicc = {  # Creación a nivel de PA (O es 'Renfe')
+                'operator': None,
+                'variable': self.get_variable().get_name(),
+                'input_value': value,
+                'function': 'no_function',
+                'setname_and_values': (self.get_term().get_real())
+            }
+        if round(value, 8) == round(float(self.get_term().get_real()), 8):
+            dicc['result'] = 1.0
+        else:
+            dicc['result'] = 0.0
+        return dicc
 
     def __str__(self) -> str:
         """Devuelve los atributos de esta clase como str.
@@ -190,18 +199,17 @@ class CategoricalAP(AtomicProposition):
 
         Attributes:
             variable(RealV): Variable real de la RealAP.
-            term (RealT): término primario de la RealAP.  
+            term (RealT): término primario de la RealAP.
     """
-    def __init__(self, variable:CategoryV, term:CategoryT):
-        AtomicProposition.__init__(self, variable, term)
 
+    def __init__(self, variable: CategoryV, term: CategoryT):
+        AtomicProposition.__init__(self, variable, term)
 
     # GETTERS
 
-
     # FUNCIONES PROPIAS
-    def membership_grade(self, value:str) -> float:
-        """Devuelve el valor de pertenencia de "value" al termino primario 
+    def membership_grade(self, value: str, trace=False) -> float:
+        """Devuelve el valor de pertenencia de "value" al termino primario
         (valor real).
 
         Args:
@@ -210,10 +218,20 @@ class CategoricalAP(AtomicProposition):
         Returns:
             float: valor de pertenencia
         """
-        if self.get_variable().is_in_categories(value) and self.get_term().get_category()==value:
-            return 1.0
-        return 0.0
-
+        dicc = {}
+        if trace:
+            dicc = {  # Creación a nivel de PA (O es 'Renfe')
+                'operator': None,
+                'variable': self.get_variable().get_name(),
+                'input_value': value,
+                'function': 'no_function',
+                'setname_and_values': (self.get_term().get_category())
+            }
+        if self.get_variable().is_in_categories(value) and self.get_term().get_category() == value:
+            dicc['result'] = 1.0
+        else:
+            dicc['result'] = 0.0
+        return dicc
 
     def __str__(self) -> str:
         """Devuelve los atributos de esta clase como str.
@@ -235,18 +253,17 @@ class FuzzyAP(AtomicProposition):
 
         Attributes:
             antecedent(LinguisticV): Variable Lingüística de la PDA.
-            CL (CL): término primario de la PDA.  
+            CL (CL): término primario de la PDA.
     """
-    def __init__(self, variable:LinguisticV, term:MembershipFS):
-        AtomicProposition.__init__(self, variable, term)
 
+    def __init__(self, variable: LinguisticV, term: MembershipFS):
+        AtomicProposition.__init__(self, variable, term)
 
     # GETTERS
 
-
     # FUNCIONES PROPIAS
-    def membership_grade(self, value:float) -> float:
-        """Devuelve el valor de pertenencia de "value" al termino primario 
+    def membership_grade(self, value: float, trace=False) -> float:
+        """Devuelve el valor de pertenencia de "value" al termino primario
         (conjunto difuso).
 
         Args:
@@ -255,8 +272,24 @@ class FuzzyAP(AtomicProposition):
         Returns:
             float: valor de pertenencia
         """
-        return self.get_term().membership_grade(value)
 
+        def function_name(function):
+            cadena = str(function)
+            inic = cadena.find(' ') + 1
+            fin = cadena[inic:].find(' ') + inic
+            return cadena[inic:fin]
+
+        dicc = {}
+        if trace:
+            dicc = {  # Creación a nivel de PA (R es R1)
+                'operator': None,
+                'variable': self.get_variable().get_name(),
+                'input_value': value,
+                'function': function_name(self.get_term().get_membership()),
+                'setname_and_values': (self.get_term().get_name(), self.get_term().get_values()[:])
+            }
+        dicc['result'] = self.get_term().membership_grade(value)
+        return dicc
 
     def __str__(self) -> str:
         """Devuelve los atributos de esta clase como str.
@@ -269,90 +302,92 @@ class FuzzyAP(AtomicProposition):
         """
         return str(self.get_variable().get_name()) + ' es ' + str(self.get_term().get_name())
 
-class PDC(CompoundProposition):
-    """ Clase para modelar una proposición difusa compuesta. 
 
-    Se modela con dos listas: (1) la primera tiene como componentes objetos PDA 
+class PDC(CompoundProposition):
+    """ Clase para modelar una proposición difusa compuesta.
+
+    Se modela con dos listas: (1) la primera tiene como componentes objetos PDA
     y/o PDC, (2) La segunda tiene conectivas implementadas como funciones (Callable)
 
         Attributes:
             proposiciones (list): Lista con las proposiciones que componen la PDC.
-            conectivas (list[Callable]): conectivas entre las PDAs que componen el 
+            conectivas (list[Callable]): conectivas entre las PDAs que componen el
             atributo "proposiciones". Tendrá una longitud un elemento inferior al
-            atributo "proposiciones". 
+            atributo "proposiciones".
     """
-    def __init__(self, propos:list, functions:dict ):
+
+    def __init__(self, propos: list, functions: dict):
         # Creación de las proposiciones a partir de "propos"
         self.proposiciones = []
         for fuz_propo in propos[0::2]:
-            if len(fuz_propo)>2:
-                self.proposiciones.append( PDC(fuz_propo, functions) )
+            if len(fuz_propo) > 2:
+                self.proposiciones.append(PDC(fuz_propo, functions))
             else:
-                if fuz_propo[0]['type']=='real':
-                    self.proposiciones.append( RealAP( # Crea PDA
+                if fuz_propo[0]['type'] == 'real':
+                    self.proposiciones.append(RealAP(  # Crea PDA
                         RealV(fuz_propo[0]['name'],
-                                  fuz_propo[0]['position'],
-                                  fuz_propo[0]['support']), # Primer parámetro un VL
-                        RealT( float(fuz_propo[1]) )  # Segundo parámetro un CD
-                        )
+                              fuz_propo[0]['position'],
+                              fuz_propo[0]['support']),  # Primer parámetro un VL
+                        RealT(float(fuz_propo[1]))  # Segundo parámetro un CD
                     )
-                if fuz_propo[0]['type']=='categorical':
-                    self.proposiciones.append( CategoricalAP( # Crea PDA
+                    )
+                if fuz_propo[0]['type'] == 'categorical':
+                    self.proposiciones.append(CategoricalAP(  # Crea PDA
                         CategoryV(fuz_propo[0]['name'],
                                   fuz_propo[0]['position'],
-                                  fuz_propo[0]['labels']), # Primer parámetro un VL
-                        CategoryT( fuz_propo[1] )  # Segundo parámetro un CD
-                        )
+                                  fuz_propo[0]['labels']),  # Primer parámetro un VL
+                        CategoryT(fuz_propo[1])  # Segundo parámetro un CD
                     )
-                if fuz_propo[0]['type']=='fuzzy':
-                    self.proposiciones.append( FuzzyAP( # Crea PDA
+                    )
+                if fuz_propo[0]['type'] == 'fuzzy':
+                    self.proposiciones.append(FuzzyAP(  # Crea PDA
                         LinguisticV(fuz_propo[0]['name'],
                                     fuz_propo[0]['position'],
                                     fuz_propo[0]['support'],
-                                    fuz_propo[0]['sets']), # Primer parámetro un VL
-                        fuz_propo[0]['sets'][fuz_propo[1]] )  # Segundo parámetro un CD
+                                    fuz_propo[0]['sets']),  # Primer parámetro un VL
+                        fuz_propo[0]['sets'][fuz_propo[1]])  # Segundo parámetro un CD
                     )
         # Creación de las conectivas a partir de "propos" y funciones
-        self.conectivas_texto = [ conec for conec in propos[1::2] ]
-        self.conectivas_funcion = [ functions[conec] for conec in propos[1::2] ]
-
+        self.conectivas_texto = [conec for conec in propos[1::2]]
+        self.conectivas_funcion = [functions[conec] for conec in propos[1::2]]
+        # print('CONECTIVAS TEXTO:', self.conectivas_texto)
+        # print('CONECTIVAS FUNCION:', self.conectivas_funcion)
 
     # GETTERS
 
     # SETTERS
 
-
     # FUNCIONES PROPIAS
-    def membership_grade(self, valores:list[float]) -> float:
+    def membership_grade(self, valores: list[float], trace=False) -> float:
         """Devuelve el grado de pertenencia del PDC.
 
         Args:
-            valores(list[float]): los valores que se pasarán a cada una de las proposiciones 
+            valores(list[float]): los valores que se pasarán a cada una de las proposiciones
 
         Returns:
             float.
         """
         result = []
         for propo in self.proposiciones:
-            if str(type(propo))[-5:-2]=='PDC':
+            if str(type(propo))[-5:-2] == 'PDC':
                 pos = propo.get_proposicion(0).get_variable().get_position()
-                #val = [valores[pos]]*propo.get_num_proposiciones()
-                result.append( propo.membership_grade(valores) )
-                #print('ENTRO EN PDC:',pos,propo.get_variable().get_name())
+                # val = [valores[pos]]*propo.get_num_proposiciones()
+                m_grade = propo.membership_grade(valores, trace)
+                result.append(m_grade)
+                # print('ENTRO EN PDC:',pos,propo.get_variable().get_name())
             else:
                 pos = propo.get_variable().get_position()
-                result.append( propo.membership_grade(valores[pos]) )
-        res = result[0]
-        for r,conec in zip(result[1:],self.conectivas_funcion):
-            res = conec(res,r)
-        return res
-        #self.get_proposicion(0).get_variable().get_name()
-        #result = self.get_proposicion(0).membership_grade(valores[0])
-        #for propo,conec,val in zip(self.proposiciones[1:],self.conectivas_funcion,valores[1:]):
-        #    if str(type(propo))[-5:-2]=='PDC':
-        #        val = [val]*propo.get_num_proposiciones()
-        #    result = conec(result,propo.membership_grade(val))
-        #return result
+                m_grade = propo.membership_grade(valores[pos], trace)
+                result.append(m_grade)
+        res = result[0]['result']
+        for r, conec in zip(result[1:], self.conectivas_funcion):
+            res = conec(res, r['result'])
+        dicc = {}
+        if trace:
+            dicc['operators'] = self.conectivas_texto[:]
+            dicc['operants'] = result
+        dicc['result'] = res
+        return dicc
 
     def __str__(self) -> str:
         """Devuelve la clase como cadena.
@@ -364,7 +399,7 @@ class PDC(CompoundProposition):
             str.
         """
         cad = ''
-        for pos,elem in enumerate(self.proposiciones):
+        for pos, elem in enumerate(self.proposiciones):
             try:
                 cad += ' (' + str(elem) + ') ' + self.conectivas_texto[pos]
             except IndexError:

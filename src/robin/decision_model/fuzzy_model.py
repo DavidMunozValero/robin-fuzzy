@@ -12,8 +12,9 @@ class FuzzyModel():
         Attributes:
             RDs (list[RDs]): lista con las reglas modeladas con objetos de tipo RD. 
     """
-    def __init__(self, rules:list[RD] ):
+    def __init__(self, rules:list[RD], variables_order ):
         self.rules = rules
+        self.variables_order = variables_order[:]
 
     # GETTERS
     def get_rule(self, pos:int) -> RD:
@@ -27,6 +28,7 @@ class FuzzyModel():
         """
         return self.rules[pos]
 
+
     def get_rules(self) -> list[RD]:
         """Devuelve la lista que contiene las reglas de todo el modelo.
 
@@ -34,6 +36,7 @@ class FuzzyModel():
             list[RD]
         """
         return self.rules
+
 
     # SETTERS
     def set_rules(self, regla:RD, pos:int) -> None:
@@ -48,6 +51,7 @@ class FuzzyModel():
         """
         self.rules[pos] = regla
 
+
     # FUNCIONES PROPIAS
     def add_rule(self, rule:RD) -> None:
         """Añade la regla pasada como parámetro al modelo.
@@ -59,6 +63,7 @@ class FuzzyModel():
             None
         """
         self.rules.append(rule)
+
 
     def __str__(self) -> str:
         """Devuelve los atributos de esta clase como str.
@@ -73,22 +78,23 @@ class FuzzyModel():
 
 
 class MandaniFuzzyModel(FuzzyModel):
-    """ Clase para modelar un modelo difuso (sistema de control). 
+    """ Clase para modelar un modelo difuso (sistema de control).
 
     Se modela con una lista que contiene objetos de tipo RD
 
         Attributes:
-            RDs (list[RDs]): lista con las reglas modeladas con objetos de tipo RD. 
+            RDs (list[RDs]): lista con las reglas modeladas con objetos de tipo RD.
     """
     def __init__(self, rules:list[MandaniRule] ):
         FuzzyModel.__init__(self, rules)
+
 
     def rule_mandani_inference(self, inputs:list[list[float]],
                                  set_name:str='Union') -> tuple[EnumeratedFS,list[float]]:
         """Realiza la inferencia tipo Mandani para una regla.
 
         Args:
-            input (list[list[float]]): estructura de lista que contienen los valores de entrada 
+            input (list[list[float]]): estructura de lista que contienen los valores de entrada
                 para realizar los cálculos
             set_name (str): nombre del conjunto difuso obtenido
 
@@ -106,11 +112,12 @@ class MandaniFuzzyModel(FuzzyModel):
         # enumerados obtenidos como salida de cada regla
         return enumerated_fs_union(enumerated_fs_list, set_name), enumerated_fs_list
 
+
     def model_mandani_inference(self, in_values:list[list]) -> list[dict]:
         """Realiza la inferencia tipo Mandani.
 
         Args:
-            in_values (list[list]): lista que contiene una lista para cada 
+            in_values (list[list]): lista que contiene una lista para cada
                 entrada a testear
 
         Returns:
@@ -127,22 +134,22 @@ class MandaniFuzzyModel(FuzzyModel):
 
 
 class TSKFuzzyModel(FuzzyModel):
-    """ Clase para modelar un modelo difuso de tipo TSK. 
+    """ Clase para modelar un modelo difuso de tipo TSK.
 
     Se modela con una lista que contiene objetos de tipo RD
 
         Attributes:
-            RDs (list[RDs]): lista con las reglas modeladas con objetos de tipo RD. 
+            RDs (list[RDs]): lista con las reglas modeladas con objetos de tipo RD.
     """
-    def __init__(self, rules:list[TSKRule] ):
-        FuzzyModel.__init__(self, rules)
+    def __init__(self, rules:list[TSKRule], variables_order):
+        FuzzyModel.__init__(self, rules, variables_order)
 
 
-    def model_tsk_inference(self, inputs:list[list[float]]) -> list[float]:
+    def model_tsk_inference(self, inputs:list[list[float]], trace=False) -> list[float]:
         """Realiza la inferencia tipo TSK para el modelo ante una entrada.
 
         Args:
-            input (list[list[float]]): estructura de lista que contienen los valores de entrada 
+            input (list[list[float]]): estructura de lista que contienen los valores de entrada
                 para realizar los cálculos sobre cada una de las variables
             set_name (str): nombre del conjunto difuso obtenido
 
@@ -154,73 +161,10 @@ class TSKFuzzyModel(FuzzyModel):
         names_list = []
         for rule in self.get_rules():
             # Calcular la pertenencia a la regla actual
-            membership_value = rule.membership_grade(inputs)
+            membership_value = rule.membership_grade(inputs)['result']
             if membership_value>0.0: # la añade al modelo si no es vacía
                 rules_membership_value_list.append( membership_value )
-                consequents_values_list.append( rule.get_consequent()(*inputs) )
-                names_list.append( rule.get_name() )
-        # Se realiza la unión de las salidas de las reglas en el CDEnumerado union
-        # obteniendo un conjunto enumerado (primer valor devuelto) y los conjuntos
-        # enumerados obtenidos como salida de cada regla
-        returns_values = [ membership*consequent
-                        for membership,consequent in zip(rules_membership_value_list,consequents_values_list)]
-        return sum(returns_values)/sum(rules_membership_value_list), rules_membership_value_list, consequents_values_list, names_list
-
-    def loop_tsk_inference(self, in_values:list[list]) -> list[dict]:
-        """Realiza la inferencia tipo Mandani sobre esta clase modelo utilizando una 
-        secuencia de entrada como una lista.
-
-        Args:
-            in_values (list[list]): lista que contiene una lista para cada 
-                entrada a testear, es la secuencia de entrada
-
-        Returns:
-            list[dict]
-        """
-        to_return = []
-        for value in in_values:
-            out_value, rules_membership_value_list, consequents_values_list, names_list = self.model_tsk_inference(value)
-            to_return.append( {'Input': value,
-                    'actives_rules': names_list,
-                    'consequents_values_list': consequents_values_list,
-                    'rule_membership_value_list': rules_membership_value_list,
-                    'Output': out_value} )
-        return to_return
-
-
-class AcumulativeTSKFuzzyModel(FuzzyModel):
-    """ Clase para modelar un modelo difuso de tipo TSK ACUMULATIVO. 
-
-    Se modela con una lista que contiene objetos de tipo RD
-
-        Attributes:
-            RDs (list[RDs]): lista con las reglas modeladas con objetos de tipo RD. 
-    """
-    def __init__(self, rules:list[TSKRule] ):
-        FuzzyModel.__init__(self, rules)
-
-
-    def model_tsk_inference(self, inputs:list[list[float]]) -> list[float]:
-        """Realiza la inferencia tipo TSK para el modelo ante una entrada UTILIZANDO EL MODELO
-        ACUMULATIVO DEL PAPER.
-
-        Args:
-            input (list[list[float]]): estructura de lista que contienen los valores de entrada 
-                para realizar los cálculos sobre cada una de las variables
-            set_name (str): nombre del conjunto difuso obtenido
-
-        Returns:
-            tuple[EnumeratedFS,list[float]]
-        """
-        rules_membership_value_list = [] # contendrá los CDEnumerados resultados de las reglas
-        consequents_values_list = []
-        names_list = []
-        for rule in self.get_rules():
-            # Calcular la pertenencia a la regla actual
-            membership_value = rule.membership_grade(inputs)
-            #print('MSRULE:', rule.get_name(), membership_value)
-            if membership_value>0.0: # la añade al modelo si no es vacía
-                rules_membership_value_list.append( membership_value ) 
+                #consequents_values_list.append( rule.get_consequent()(*inputs) )
                 consequents_values_list.append( rule.get_consequent()() )
                 names_list.append( rule.get_name() )
         # Se realiza la unión de las salidas de las reglas en el CDEnumerado union
@@ -228,15 +172,19 @@ class AcumulativeTSKFuzzyModel(FuzzyModel):
         # enumerados obtenidos como salida de cada regla
         returns_values = [ membership*consequent
                         for membership,consequent in zip(rules_membership_value_list,consequents_values_list)]
-        return sum(returns_values), rules_membership_value_list, consequents_values_list, names_list
+        if trace:
+            pass
+        else:
+            pass
+        return sum(returns_values)/sum(rules_membership_value_list), rules_membership_value_list, consequents_values_list, names_list
 
 
-    def loop_tsk_inference(self, in_values:list[list]) -> list[dict]:
-        """Realiza la inferencia tipo Mandani sobre esta clase modelo utilizando una 
+    def loop_tsk_inference(self, in_values:list[list], trace=False) -> list[dict]:
+        """Realiza la inferencia tipo Mandani sobre esta clase modelo utilizando una
         secuencia de entrada como una lista.
 
         Args:
-            in_values (list[list]): lista que contiene una lista para cada 
+            in_values (list[list]): lista que contiene una lista para cada
                 entrada a testear, es la secuencia de entrada
 
         Returns:
@@ -250,21 +198,73 @@ class AcumulativeTSKFuzzyModel(FuzzyModel):
                     'consequents_values_list': consequents_values_list,
                     'rule_membership_value_list': rules_membership_value_list,
                     'Output': out_value} )
+        if trace:
+            pass
+        else:
+            pass
         return to_return
 
-    def tsk_inference(self, value: list) -> dict:
-        """Realiza la inferencia tipo Mandani sobre esta clase modelo utilizando una
-        única entrada.
+class AcumulativeTSKFuzzyModel(FuzzyModel):
+    """ Clase para modelar un modelo difuso de tipo TSK ACUMULATIVO.
+
+    Se modela con una lista que contiene objetos de tipo RD
+
+        Attributes:
+            RDs (list[RDs]): lista con las reglas modeladas con objetos de tipo RD.
+    """
+    def __init__(self, rules:list[TSKRule], variables_order):
+        FuzzyModel.__init__(self, rules, variables_order)
+
+
+    def model_tsk_inference(self, inputs:list[list[float]],trace=False) -> list[float]:
+        """Realiza la inferencia tipo TSK para el modelo ante una entrada UTILIZANDO EL MODELO
+        ACUMULATIVO DEL PAPER.
 
         Args:
-            in_values (list): lista que contiene una entrada a testear
+            input (list[list[float]]): estructura de lista que contienen los valores de entrada
+                para realizar los cálculos sobre cada una de las variables
+            set_name (str): nombre del conjunto difuso obtenido
+
+        Returns:
+            tuple[EnumeratedFS,list[float]]
+        """
+        dictionaries = []
+        for rule in self.get_rules():
+            # Calcular la pertenencia a la regla actual
+            dicc = rule.eval_rule(inputs, trace)
+            if dicc['result']>0.0:
+                dictionaries.append(dicc)
+        # Se realiza la unión de las salidas de las reglas en el CDEnumerado union
+        # obteniendo un conjunto enumerado (primer valor devuelto) y los conjuntos
+        # enumerados obtenidos como salida de cada regla
+        if trace:
+            output_model = {
+                'variables_order': self.variables_order[:],
+                'input':inputs[:],
+                'result':sum( [dic['result'] for dic in dictionaries] ),
+                'trace_of_each_rule':dictionaries
+            }
+            return output_model
+        else:
+            return {
+                'variables_order': self.variables_order[:],
+                'input':inputs[:],
+                'result':sum( [dic['result'] for dic in dictionaries] )
+            }
+
+
+    def loop_tsk_inference(self, in_values:list[list],trace=False) -> list[dict]:
+        """Realiza la inferencia tipo Mandani sobre esta clase modelo utilizando una
+        secuencia de entrada como una lista.
+
+        Args:
+            in_values (list[list]): lista que contiene una lista para cada
+                entrada a testear, es la secuencia de entrada
 
         Returns:
             list[dict]
         """
-        out_value, rules_membership_value_list, consequents_values_list, names_list = self.model_tsk_inference(value)
-        return {'Input': value,
-                'actives_rules': names_list,
-                'consequents_values_list': consequents_values_list,
-                'rule_membership_value_list': rules_membership_value_list,
-                'Output': out_value}
+        to_return = []
+        for value in in_values:
+            to_return.append( self.model_tsk_inference(value,trace) )
+        return to_return

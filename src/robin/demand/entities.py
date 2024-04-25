@@ -16,6 +16,8 @@ from .utils import get_function, get_scipy_distribution, get_euclidean_distance
 from pathlib import Path
 from typing import Any, List, Mapping, Union, Tuple
 
+VARIABLES_ORDER = ['origin', 'destination', 'departure_time', 'arrival_time', 'seat', 'price', 'tsp']
+
 
 class Market:
     """
@@ -621,7 +623,7 @@ class Passenger:
         self.arrival_time = arrival_time
         self.purchase_day = purchase_day
         behaviour_rules = get_rules_from_dict(passenger_rules, user_pattern.behaviour_variables)
-        self.behaviour_model = AcumulativeTSKFuzzyModel(behaviour_rules)
+        self.behaviour_model = AcumulativeTSKFuzzyModel(behaviour_rules, variables_order=VARIABLES_ORDER)
         self.early_stop = np.random.normal() < user_pattern.early_stop
         self.service = None
         self.service_departure_time = None
@@ -665,7 +667,7 @@ class Passenger:
                          'rule_membership_value_list': [1, 0.5],
                          'Output': 42.5}
         """
-        return self.behaviour_model.tsk_inference(input_values)
+        return self.behaviour_model.model_tsk_inference(input_values, trace=True)
 
     def get_fuzzy_utility(
             self,
@@ -712,7 +714,7 @@ class Passenger:
         user_var_names = tuple(self.user_pattern.behaviour_variables.keys())
         service_vars = [service_vars[var] for var in user_var_names]
 
-        return self.behaviour_inference(service_vars)["Output"]
+        return self.behaviour_inference(service_vars)['result']
 
     def __str__(self) -> str:
         """

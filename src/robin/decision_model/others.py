@@ -8,7 +8,7 @@ def and_t_norma(val1:float, val2:float):
     """
     T-norma del producto
     """
-    return val1*val2
+    return min(val1, val2)
 
 
 def or_t_conorma(val1:float, val2:float):

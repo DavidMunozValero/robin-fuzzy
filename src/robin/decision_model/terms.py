@@ -57,7 +57,7 @@ class CategoryT(Term):
 ################################
 # COMIENZA LA CLASE MembershipFS Y EnumerateFS
 ################################
-def triangular(in_val, values:tuple) -> float:
+def triangular(in_val, values: tuple) -> float:
     """ Función que calcula una función de pertenencia triangular
 
         Args:
@@ -67,17 +67,19 @@ def triangular(in_val, values:tuple) -> float:
         Returns:
                 float: valor de pertenencia de val al conjunto representado por valores.
     """
-    if in_val<values[0]:
+    if in_val < values[0]:
         return 0.0
-    if in_val>=values[0] and in_val<values[1]:
-        return (in_val-values[0])/(values[1]-values[0])
-    if in_val>=values[1] and in_val<=values[2]:
-        return (values[2]-in_val)/(values[2]-values[1])
-    if in_val>values[2]:
+    if in_val >= values[0] and in_val <= values[1]:
+        if values[0] == values[1]:
+            return 1.0
+        return (in_val - values[0]) / (values[1] - values[0])
+    if in_val > values[1] and in_val <= values[2]:
+        return (values[2] - in_val) / (values[2] - values[1])
+    if in_val > values[2]:
         return 0.0
 
 
-def trapezoidal(in_val, values:tuple) -> float:
+def trapezoidal(in_val, values: tuple) -> float:
     """ Función que calcula una función de pertenencia trapezoidal
 
         Args:
@@ -87,35 +89,35 @@ def trapezoidal(in_val, values:tuple) -> float:
         Returns:
                 float: valor de pertenencia de val al conjunto representado por valores.
     """
-    if in_val<values[0]:
+    if in_val < values[0]:
         return 0.0
-    if in_val>=values[0] and in_val<values[1]:
-        return (in_val-values[0])/(values[1]-values[0])
-    if in_val>=values[1] and in_val<=values[2]:
+    if in_val >= values[0] and in_val < values[1]:
+        return (in_val - values[0]) / (values[1] - values[0])
+    if in_val >= values[1] and in_val <= values[2]:
         return 1
-    if in_val>=values[2] and in_val<=values[3]:
-        return (values[3]-in_val)/(values[3]-values[2])
-    if in_val>values[3]:
+    if in_val >= values[2] and in_val <= values[3]:
+        return (values[3] - in_val) / (values[3] - values[2])
+    if in_val > values[3]:
         return 0
 
 
 class MembershipFS(Term):
-    """ Clase para modelar una conjunto difuso 
+    """ Clase para modelar una conjunto difuso
 
-        Esta clase modela un conjunto difuso con cualquier tipo de función de 
-        pertenencia. Se debe pasar la función de pertenencia en la creación 
+        Esta clase modela un conjunto difuso con cualquier tipo de función de
+        pertenencia. Se debe pasar la función de pertenencia en la creación
         del objeto
 
         Attributes:
                 nombre (str): str que contiene el nombre del conjunto.
                 valores (tuple[float]): tuple de floats que definen el conjunto difuso.
-                func_pert (Callable): función que calcula la pertenencia de los valores.  
+                func_pert (Callable): función que calcula la pertenencia de los valores.
     """
-    def __init__(self, name:str, function: Callable[[tuple],float], values:tuple):
+
+    def __init__(self, name: str, function: Callable[[tuple], float], values: tuple):
         self.name = name
         self.values = values
         self.function = function
-
 
     # GETTERS
     def get_name(self) -> str:
@@ -129,7 +131,6 @@ class MembershipFS(Term):
         """
         return self.name
 
-
     def get_values(self) -> tuple[float]:
         """Devuelve los valores del MembershipFS.
 
@@ -140,7 +141,6 @@ class MembershipFS(Term):
             tuple of a indeterminate number of floats.
         """
         return self.values
-
 
     def get_membership(self) -> Callable:
         """Devuelve la función python utilizada como función de pertenencia.
@@ -153,9 +153,8 @@ class MembershipFS(Term):
         """
         return self.function
 
-
-    #SETTERS
-    def set_name(self, name:str) -> None:
+    # SETTERS
+    def set_name(self, name: str) -> None:
         """Asigna el nombre del MembershipFS.
 
         Args:
@@ -166,8 +165,7 @@ class MembershipFS(Term):
         """
         self.name = name
 
-
-    def set_values(self, values:tuple[float]) -> None:
+    def set_values(self, values: tuple[float]) -> None:
         """Asigna los valores a utilizar por la función de pertenencia.
 
         Args:
@@ -178,7 +176,7 @@ class MembershipFS(Term):
         """
         self.values = values
 
-    def set_func_pert(self, m_function:Callable[[tuple],float]) -> None:
+    def set_func_pert(self, m_function: Callable[[tuple], float]) -> None:
         """Asigna la función python a utilizar como función de pertenencia.
 
         Args:
@@ -196,15 +194,14 @@ class MembershipFS(Term):
 
          Args:
             None
-            
+
         Returns:
                 str.
         """
         return str(self.name) + ': ' + str(self.values)
 
-
-    def membership_grade(self, in_val:float) -> float:
-        """Calcula la pertenencia de in_val al conjunto difuso que modela esta clase 
+    def membership_grade(self, in_val: float) -> float:
+        """Calcula la pertenencia de in_val al conjunto difuso que modela esta clase
         según la función en self.function.
 
         Args:
@@ -213,7 +210,7 @@ class MembershipFS(Term):
         Returns:
                 float.
         """
-        return self.function( in_val, self.values )
+        return self.function(in_val, self.values)
 
 
 class EnumeratedFS():
@@ -224,13 +221,13 @@ class EnumeratedFS():
         Attributes:
                 x_valores (list[float]): valor del que se tiene la pertenencia.
                 y_valores (list[float]): valor de pertenencia.
-                func_pert (Callable): función que calcula la pertenencia de los valores.  
+                func_pert (Callable): función que calcula la pertenencia de los valores.
     """
-    def __init__(self, name:str, x_values: tuple[float], y_values:tuple[float]):
+
+    def __init__(self, name: str, x_values: tuple[float], y_values: tuple[float]):
         self.name = name
         self.x_values = x_values
         self.y_values = y_values
-
 
     # GETTERS
     def get_name(self) -> str:
@@ -244,7 +241,6 @@ class EnumeratedFS():
         """
         return self.name
 
-
     def get_x_values(self) -> tuple:
         """Devuelve los valores de X del MembershipFS.
 
@@ -255,7 +251,6 @@ class EnumeratedFS():
             tuple of a indeterminate number of floats.
         """
         return self.x_values
-
 
     def get_y_values(self) -> tuple:
         """Devuelve los valores de Y de MembershipFS.
@@ -269,15 +264,15 @@ class EnumeratedFS():
         return self.y_values
 
     # FUNCIONES PROPIAS
-    def genera_grafica(self, legend_label:str='', graphic_show:bool=True,
-                    centroid_show:bool=True) -> None:
+    def genera_grafica(self, legend_label: str = '', graphic_show: bool = True,
+                       centroid_show: bool = True) -> None:
         """Devuelve la gráfica del EnumeratedFS.
 
         Args:
             legend_label(str): la leyenda a mostrar
             graphic_show(bool): si se muestra la gráfica
-            centroid_show(bool): en caso de mostrar la gráfica si se desea mostrar 
-                la ubicación del centroide 
+            centroid_show(bool): en caso de mostrar la gráfica si se desea mostrar
+                la ubicación del centroide
 
         Returns:
             None.
@@ -285,17 +280,17 @@ class EnumeratedFS():
         line, = plt.plot(self.get_x_values(), self.get_y_values())
         x_line2d = [line]
         list_legends = []
-        if legend_label!= '':
+        if legend_label != '':
             list_legends = [legend_label]
         else:
             list_legends = [self.get_name()]
         if centroid_show:
             cent = self.centroide()
-            line, = plt.plot([cent,cent],[0,1])
+            line, = plt.plot([cent, cent], [0, 1])
             x_line2d.append(line)
-            list_legends.append( 'defuzz val = ' + str( round(cent,2) ) )
+            list_legends.append('defuzz val = ' + str(round(cent, 2)))
         # Coloca los valores del eje Y y leyendas
-        plt.yticks(np.arange(0,1.1,0.1))
+        plt.yticks(np.arange(0, 1.1, 0.1))
         plt.legend(x_line2d, list_legends, loc='best')
         # Muestra la gráfica
         if graphic_show:
@@ -310,16 +305,16 @@ class EnumeratedFS():
         Returns:
             float.
         """
-        nume = sum( [a*b for a,b in zip(self.get_x_values(),self.get_y_values())] )
+        nume = sum([a * b for a, b in zip(self.get_x_values(), self.get_y_values())])
         deno = sum(self.get_y_values())
-        return nume/deno
+        return nume / deno
 
 
 # función que una varios conjuntos enumerados en uno
-def enumerated_fs_union(enumerated_sets:list, name:str) -> EnumeratedFS:
+def enumerated_fs_union(enumerated_sets: list, name: str) -> EnumeratedFS:
     """Devuelve un EnumeratedFS que es la unión/agregación de todos los
         EnumeratedFS en ctosEnuemr.
-    
+
     Args:
         EnumeratedSets(list)
         name(str)
@@ -331,10 +326,10 @@ def enumerated_fs_union(enumerated_sets:list, name:str) -> EnumeratedFS:
     y_union = []
     for cto in enumerated_sets:
         comp_x, comp_y = cto.get_x_values(), cto.get_y_values()
-        if not y_union: # Equivalente a "y_union==[]"
+        if not y_union:  # Equivalente a "y_union==[]"
             x_union = comp_x
             y_union = comp_y
         else:
             x_union = comp_x
-            y_union = [ max(e,e1) for e,e1 in zip(y_union,comp_y) ]
+            y_union = [max(e, e1) for e, e1 in zip(y_union, comp_y)]
     return EnumeratedFS(name, x_union, y_union)
