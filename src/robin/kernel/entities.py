@@ -83,10 +83,23 @@ class Kernel:
 
         utilities_df.to_csv(output_path.parent / 'utilities.csv', index=False)
 
+    def _to_json(self, output_path: Path, inference_trace: dict) -> None:
+        """
+        Save inference trace to json file.
+
+        Args:
+            output_path (Path): Path to the output json file.
+            inference_trace (dict): Inference trace.
+        """
+        import json
+        with open(output_path, 'w') as f:
+            json.dump(inference_trace, f, indent=4)
+
     def simulate(
             self,
             output_path: Union[Path, None] = None,
-            departure_time_hard_restriction: bool = False
+            departure_time_hard_restriction: bool = False,
+            save_trace: bool = False
         ) -> List[Service]:
         """
         Simulate the demand-supply interaction.
@@ -98,10 +111,14 @@ class Kernel:
             output_path (Path, optional): Path to the output csv file. Defaults to None.
             departure_time_hard_restriction (bool, optional): If True, the passenger will not
                 be assigned to a service with a departure time that is not valid. Defaults to True.
+            save_trace (bool, optional): If True, the inference trace will be saved. Defaults to False.
 
         Returns:
             List[Service]: List of services with updated tickets.
         """
+        inference_trace = {}
+        trace = None
+
         # Generate passengers demand
         passengers = self.demand.generate_passengers()
         
@@ -137,12 +154,12 @@ class Kernel:
             for service in services:
                 for seat in service.prices.get((origin, destination), {}).keys():
                     # Calculate utility
-                    utility = passenger.get_fuzzy_utility(
+                    inference_result = passenger.get_fuzzy_utility(
                         seat=seat,
                         service=service,
                         departure_time_hard_restriction=departure_time_hard_restriction
                     )
-
+                    utility = inference_result['result']
                     passenger.utility_history[(service.id, seat.id)] = {'service': service,
                                                                         'seat': seat,
                                                                         'price': service.prices[(origin, destination)][seat],
@@ -165,6 +182,7 @@ class Kernel:
                         seat_arg_max = seat
                         seat_utility = utility
                         ticket_price = service.prices[(origin, destination)][seat]
+                        trace = inference_result
 
             if passenger.early_stop:
                 for i, key in enumerate(passenger.utility_history.keys()):
@@ -178,6 +196,9 @@ class Kernel:
             if seat_utility > passenger.user_pattern.utility_threshold:
                 assert service_arg_max is not None
                 assert seat_arg_max is not None
+                if save_trace:
+                    inference_trace[passenger.id] = trace
+
                 ticket_bought = service_arg_max.buy_ticket(
                     origin=passenger.market.departure_station,
                     destination=passenger.market.arrival_station,
@@ -201,9 +222,11 @@ class Kernel:
         # Save passengers data to csv file
         if output_path is not None:
             self._to_csv(passengers, output_path)
+            if save_trace:
+                self._to_json(output_path.parent / 'inference_trace.json', inference_trace)
 
         return self.supply.services
-    
+
     def set_seed(self, seed: int) -> None:
         """
         Set seed for the random number generator.

@@ -674,7 +674,7 @@ class Passenger:
             seat: Seat,
             service: Service,
             departure_time_hard_restriction: bool = False
-        ) -> float:
+        ) -> Mapping:
         """
         Returns the utility of the passenger given the seat, the arrival time, the departure time and the price.
 
@@ -696,7 +696,7 @@ class Passenger:
         price = service.prices[(origin, destination)][seat]
 
         if departure_time_hard_restriction and not self._is_valid_departure_time(service_departure_time):
-            return -np.inf  # Minimum utility
+            return {'result': -np.inf}  # Minimum utility
 
         distance_to_origin = get_euclidean_distance(a=origin_coords,
                                                     b=service.line.corridor.stations[origin].coords)
@@ -714,7 +714,7 @@ class Passenger:
         user_var_names = tuple(self.user_pattern.behaviour_variables.keys())
         service_vars = [service_vars[var] for var in user_var_names]
 
-        return self.behaviour_inference(service_vars)['result']
+        return self.behaviour_inference(service_vars)
 
     def __str__(self) -> str:
         """
