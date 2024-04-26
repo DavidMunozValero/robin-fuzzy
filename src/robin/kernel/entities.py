@@ -197,6 +197,7 @@ class Kernel:
                 assert service_arg_max is not None
                 assert seat_arg_max is not None
                 if save_trace:
+                    trace['user_pattern'] = passenger.user_pattern.name
                     inference_trace[passenger.id] = trace
 
                 ticket_bought = service_arg_max.buy_ticket(
