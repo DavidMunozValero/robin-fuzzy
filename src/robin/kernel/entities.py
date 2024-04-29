@@ -196,9 +196,6 @@ class Kernel:
             if seat_utility > passenger.user_pattern.utility_threshold:
                 assert service_arg_max is not None
                 assert seat_arg_max is not None
-                if save_trace:
-                    trace['user_pattern'] = passenger.user_pattern.name
-                    inference_trace[passenger.id] = trace
 
                 ticket_bought = service_arg_max.buy_ticket(
                     origin=passenger.market.departure_station,
@@ -213,6 +210,9 @@ class Kernel:
                     passenger.seat = seat_arg_max.name
                     passenger.ticket_price = ticket_price
                     passenger.utility = seat_utility
+                    if save_trace:
+                        trace['user_pattern'] = passenger.user_pattern.name
+                        inference_trace[passenger.id] = trace
 
             # Even if passenger doesn't buy ticket, save best service found (if utility is positive)
             if seat_utility_global > 0:
