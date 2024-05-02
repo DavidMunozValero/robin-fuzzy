@@ -45,7 +45,7 @@ class Kernel:
             output_path (Path, optional): Path to the output csv file. Defaults to 'output.csv'.
         """
         column_names = [
-            'id', 'user_pattern', 'departure_station', 'arrival_station',
+            'id', 'user_pattern', 'threshold', 'departure_station', 'arrival_station',
             'arrival_day', 'arrival_time', 'purchase_day', 'service', 'service_departure_time',
             'service_arrival_time', 'seat', 'price', 'utility', 'best_service', 'best_seat', 'best_utility'
         ]
@@ -55,6 +55,7 @@ class Kernel:
             data.append([
                 passenger.id,
                 passenger.user_pattern,
+                passenger.user_pattern.utility_threshold,
                 passenger.market.departure_station,
                 passenger.market.arrival_station,
                 passenger.arrival_day,
@@ -144,13 +145,12 @@ class Kernel:
             # Calculate utility for each service and seat
             service_arg_max = None
             seat_arg_max = None
-            seat_utility = 0
+            seat_utility = passenger.user_pattern.utility_threshold
             ticket_price = 0
             service_arg_max_global = 0
             seat_arg_max_global = 0
             seat_utility_global = 0
 
-            passenger_row = {}
             for service in services:
                 for seat in service.prices.get((origin, destination), {}).keys():
                     # Calculate utility
