@@ -91,7 +91,7 @@ def build_service(id_: str,
     """
     date_str = date.strftime('%Y-%m-%d')
     time_str = ".".join(str(time_slot.start).split(":")[:2])
-    return Service(id_=f'{id_}_{date_str}-{time_str}',
+    return Service(id_=id_,
                    date=date,
                    line=line,
                    time_slot=time_slot,
