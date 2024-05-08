@@ -72,8 +72,8 @@ def build_service(id_: str,
                   time_slot: TimeSlot,
                   tsp: TSP,
                   rs: RollingStock,
-                  prices: Dict
-                  ) -> Service:
+                  prices: Dict,
+                  build_service_id: bool=True) -> Service:
     """
     Build service object from parameters
 
@@ -91,7 +91,8 @@ def build_service(id_: str,
     """
     date_str = date.strftime('%Y-%m-%d')
     time_str = ".".join(str(time_slot.start).split(":")[:2])
-    return Service(id_=id_,
+    service_id = f'{id_}_{date_str}-{time_str}' if build_service_id else id_
+    return Service(id_=service_id,
                    date=date,
                    line=line,
                    time_slot=time_slot,
