@@ -83,7 +83,7 @@ class ServiceGenerator:
         for i in range(n_services):
             services.append(self._generate_service(id_=str(i)))
 
-        self.services += services
+        self.services = services
         self.save_to_yaml(services, file_name)
         return services
 
@@ -104,7 +104,7 @@ class ServiceGenerator:
         yaml_dict = {'stations': [station_to_dict(stn) for stn in self.stations.values()],
                      'seat': [seat_to_dict(s) for s in self.seats.values()],
                      'corridor': [corridor_to_dict(corr) for corr in self.corridors.values()],
-                     'line': [line_to_dict(ln) for ln in self.lines.values()],
+                     'line': [line_to_dict(service.line) for service in services],
                      'rollingStock': [rolling_stock_to_dict(rs) for rs in rolling_stocks],
                      'trainServiceProvider': [tsp_to_dict(tsp) for tsp in self.tsps.values()],
                      'timeSlot': [time_slot_to_dict(s) for s in self.time_slots.values()],
@@ -119,7 +119,7 @@ class ServiceGenerator:
         Returns:
             Service: Service object
         """
-        line = self._get_random_line()
+        line = self._get_random_line(id_)
         time_slot = self._get_random_time_slot()
         tsp = self._get_random_tsp()
         rs = self._get_random_rs(tsp)
@@ -233,7 +233,7 @@ class ServiceGenerator:
         self.time_slots[time_slot_id] = ts
         return ts
 
-    def _get_random_line(self) -> Line:
+    def _get_random_line(self, id_) -> Line:
         """
         Get random line from corridor
 
@@ -244,6 +244,8 @@ class ServiceGenerator:
         line = random.choices(list(self.lines.values()), weights=list(probs))[0]
 
         timetable = {}
+        tt_randomizer = np.random.uniform(low=0.0, high=0.4)
+        dt_randomizer = np.random.uniform(low=0.0, high=0.5)
         for i, station in enumerate(line.timetable):
             arrival, departure = line.timetable[station]
 
@@ -252,14 +254,14 @@ class ServiceGenerator:
             else:
                 ref_stop_time = departure - arrival
                 travel_time = arrival - prev_dt
-                arrival = float(round(prev_dt + (travel_time + travel_time * np.random.uniform(low=0.0, high=0.2))))
-                departure = float(round(arrival + ref_stop_time + ref_stop_time * np.random.uniform(low=0.0, high=0.2)))
+                arrival = float(round(prev_dt + (travel_time + travel_time * tt_randomizer)))
+                departure = float(round(arrival + ref_stop_time + ref_stop_time * dt_randomizer))
 
             timetable[station] = (arrival, departure)
 
         # Encode timetable to string (Hash or something) for unique line id based on timetable
         line_id = str(hash(str(timetable.values())))
-        return Line(line.id, line.name, line.corridor, timetable)
+        return Line(f"Line_{id_}", line.name, line.corridor, timetable)
 
     @staticmethod
     def _write_to_yaml(filename: Path, objects):
