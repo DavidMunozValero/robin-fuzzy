@@ -124,9 +124,9 @@ class KernelPlotter:
 
         passengers = sum(demand_data.values())
         ax.set_facecolor('#F5F5F5')
-        ax.set_title(f'Demand analysis - {round(demand_served/passengers * 100, 2)}% bought ticket', fontweight='bold')
-        ax.set_ylabel('Number of passengers')
-        ax.set_xlabel('Status', labelpad=10)
+        ax.set_title(f'Análisis de demanda - {round(demand_served/passengers * 100, 2)}% compran billete', fontweight='bold', pad=10, fontsize=16)
+        ax.set_ylabel('Número de pasajeros', fontsize=14)
+        ax.set_xlabel('Situación', labelpad=10, fontsize=14)
         ax.set_xticks(np.arange(len(demand_data)))
         xticklables = [x_labels[int(status)] for status in demand_data]
         ax.set_xticklabels(xticklables, fontsize=8)
@@ -176,11 +176,11 @@ class KernelPlotter:
 
         # Plot the data
         ax.set_facecolor(WHITE_SMOKE)
-        ax.set_title(title, fontweight='bold')
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel, labelpad=10)
+        ax.set_title(title, fontweight='bold', fontsize=15)
+        ax.set_xlabel(xlabel, fontsize=14)
+        ax.set_ylabel(ylabel, labelpad=10, fontsize=14)
         ax.set_xticks(np.arange(len(data)))
-        ax.set_xticklabels(data.keys(), rotation=rotation, ha='right')
+        ax.set_xticklabels(data.keys(), rotation=rotation, ha='right', fontsize=12)
         ax.set_xlim(-0.5, len(data) - 0.5)
         ax.set_ylim(-service_max_capacity * 1.1, service_max_capacity * 1.1)
         for i, tickets in enumerate(data.values()):
@@ -202,7 +202,7 @@ class KernelPlotter:
                     zorder=2
                 )
         ax.grid(axis='y', color='#A9A9A9', alpha=0.3, zorder=1)
-        ax.legend(['Train occupation', 'Embarking passengers', 'Disembarking passengers'], loc='lower left')
+        ax.legend(['Ocupación', 'Pasajeros embarcados', 'Pasajeros desembarcados'], loc='lower left')
         ax.axhline(y=0, color='black', linewidth=0.5, zorder=1)
         ax.axhline(y=service_max_capacity, color='lightcoral', linewidth=2, zorder=1)
         ax.axhline(y=-service_max_capacity, color='lightcoral', linewidth=2, zorder=1)
@@ -229,9 +229,9 @@ class KernelPlotter:
         self._plot_bar_chart(
             data=data,
             service_max_capacity=service_max_capacity,
-            title=f'Capacity for service {service_id}',
-            xlabel='Station',
-            ylabel='Passengers',
+            title=f'Capacidad para el servicio {service_id}',
+            xlabel='Estaciones',
+            ylabel='Pasajeros',
             rotation=25,
             save_path=save_path
         )
@@ -239,9 +239,9 @@ class KernelPlotter:
     def plot_tickets_by_pair(self, y_limit: int = None, save_path: str = None, seat_disaggregation: bool = False):
         def set_ax_properties(ax, pairs, y_limit, title, x_labels):
             ax.set_facecolor('#F5F5F5')
-            ax.set_title(title, fontweight='bold')
-            ax.set_ylabel('Number of tickets sold')
-            ax.set_xlabel('Trip (Origin-Destination)', labelpad=10)
+            ax.set_title(title, fontweight='bold', fontsize=16)
+            ax.set_ylabel('Billetes vendidos', fontsize=14)
+            ax.set_xlabel('Mercado (Origen-Destino)', labelpad=10, fontsize=14)
             ax.set_xticks(np.arange(len(pairs)))
             ax.set_xticklabels(x_labels, fontsize=8)
             ax.set_xlim([-0.5, len(pairs) - 0.5])
@@ -262,7 +262,7 @@ class KernelPlotter:
 
             y_limit = y_limit if y_limit is not None else max(sum(v.values()) for v in pairs_seat_sold.values()) * 1.1
             set_ax_properties(axs, pairs_seat_sold, y_limit,
-                              f'Tickets sold by trip ({total_tickets_sold} tickets sold)', pairs)
+                              f'Billetes vendidos por mercado ({total_tickets_sold} billetes vendidos)', pairs)
 
             bottom = np.zeros(len(pairs_seat_sold))
             total_values = np.zeros(len(pairs_seat_sold))
@@ -290,7 +290,7 @@ class KernelPlotter:
             fig.subplots_adjust(hspace=0.75, bottom=0.2, top=0.9)
 
             y_limit = y_limit if y_limit is not None else max(pairs_sold.values()) * 1.1
-            set_ax_properties(ax, pairs_sold, y_limit, f'Tickets sold by trip ({total_tickets_sold} tickets sold)',
+            set_ax_properties(ax, pairs_sold, y_limit, f'Billetes vendidos por mercado ({total_tickets_sold} billetes vendidos)',
                               pairs)
 
             for i, pair in enumerate(pairs):
@@ -310,14 +310,14 @@ class KernelPlotter:
         seat_types = sorted(set(st for d in data for ut in data[d] for st in data[d][ut]))
 
         fig, axs = plt.subplots(len(user_types), 1, figsize=(7, 4 * len(user_types)))
-        fig.subplots_adjust(hspace=0.75, bottom=0.2, top=0.9)
+        fig.subplots_adjust(hspace=0.9, bottom=0.3, top=0.95)
 
         for i, user_type in enumerate(user_types):
             ax = axs[i]
             ax.set_facecolor('#F5F5F5')
-            ax.set_title(f'Tickets sold for user type "{user_type}"', fontweight='bold')
-            ax.set_ylabel('Number of tickets')
-            ax.set_xlabel('Arrival date', labelpad=10)
+            ax.set_title(f'Compras del perfil "{user_type}"', fontweight='bold', fontsize=15)
+            ax.set_ylabel('Número de billetes', fontsize=14)
+            ax.set_xlabel('Día de compra', labelpad=10, fontsize=14)
             ax.set_xticks(np.arange(len(data)))
             ax.set_xticklabels(data.keys(), rotation=60, fontsize=8, ha='right')
             ax.set_xlim([-0.5, len(data)])
@@ -351,9 +351,9 @@ class KernelPlotter:
         fig.subplots_adjust(hspace=0.75, bottom=0.2, top=0.9)
 
         ax.set_facecolor('#F5F5F5')
-        ax.set_title(f'Tickets sold by day', fontweight='bold')
-        ax.set_ylabel('Number of tickets')
-        ax.set_xlabel('Month', labelpad=10)
+        ax.set_title(f'Billetes vendidos por día', fontweight='bold', fontsize=16)
+        ax.set_ylabel('Número de billetes', fontsize=14)
+        ax.set_xlabel('Día', labelpad=10, fontsize=14)
         ax.set_xticks(np.arange(0, len(tickets_by_arrival_day_seat), len(tickets_by_arrival_day_seat) / 12))
         ax.set_xticklabels([month_name[i] for i in range(1, 13, 1)], rotation=60, fontsize=8, ha='right')
         ax.set_xlim([-0.5, len(tickets_by_arrival_day_seat)])
@@ -393,9 +393,9 @@ class KernelPlotter:
         fig.subplots_adjust(hspace=0.75, bottom=0.2, top=0.9)
 
         ax.set_facecolor('#F5F5F5')
-        ax.set_title(f'Tickets sold by day', fontweight='bold')
-        ax.set_ylabel('Number of tickets')
-        ax.set_xlabel('Purchase date', labelpad=10)
+        ax.set_title(f'Billetes vendidos por día', fontweight='bold', fontsize=16)
+        ax.set_ylabel('Número de billetes', fontsize=14)
+        ax.set_xlabel('Fecha de compra', labelpad=10, fontsize=14)
         ax.set_xticks(np.arange(len(tickets_by_date_seat)))
         ax.set_xticklabels(tickets_by_date_seat.keys(), rotation=60, fontsize=8, ha='right')
         ax.set_xlim([-0.5, len(tickets_by_date_seat)])
@@ -430,7 +430,7 @@ class KernelPlotter:
         fig, ax = plt.subplots(1, 1, figsize=(7, 4))
         colors = [self.colors[i % len(self.colors)] for i, _ in enumerate(tickets_sold_by_seat.keys())]
 
-        ax.set_title('Seat types distribution', fontweight='bold')
+        ax.set_title('Distribución por tipo de asiento', fontweight='bold', fontsize=16)
         ax.pie(tickets_sold_by_seat.values(), labels=tickets_sold_by_seat.keys(), colors=colors, autopct='%1.1f%%')
         ax.legend(bbox_to_anchor=(0.2, 0.2))
         plt.show()
@@ -457,7 +457,7 @@ class KernelPlotter:
 
         for i, user_type in enumerate(dict_user_seat.keys()):
             ax = axs[i]
-            ax.set_title(f'Seat distribution for {user_type} users', fontweight='bold')
+            ax.set_title(f'Distribución de asientos perfil {user_type}', fontweight='bold', fontsize=16)
             colors = [self.colors[i % len(self.colors)] for i, _ in enumerate(dict_user_seat[user_type].keys())]
             ax.pie(dict_user_seat[user_type].values(), labels=dict_user_seat[user_type].keys(), colors=colors, autopct='%1.1f%%')
             ax.legend(bbox_to_anchor=(0.2, 0.2))

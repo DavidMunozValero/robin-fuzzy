@@ -58,10 +58,10 @@ def get_passenger_status(df: pd.DataFrame) -> Tuple[Mapping[int, int], List[str]
         1: df[~df.service.isnull()].shape[0] - df[df['service'] == df['best_service']].shape[0]
     }
 
-    x_labels = ["User found \nany service that\nmet his needs\nbut couldn't purchase.",
-                "User bought\na service which\nwas not the one\nwith the best utility.",
-                "User bought\nthe ticket with\nbest utility.",
-                "User didn't find\nany ticket\nthat met his needs."]
+    x_labels = ["Encontraron\nalgún billete\nútil, pero\nno pudieron\ncomprar.",
+                "Compraron\nun billete\ndiferente al de\nmayor utilidad.",
+                "Compraron\nel billete con\nmayor utilidad.",
+                "No encontraron\nningún billete\nútil."]
 
     return dict(sorted(data.items(), key=lambda x: x[1], reverse=True)), x_labels
 
