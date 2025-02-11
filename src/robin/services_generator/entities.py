@@ -15,7 +15,7 @@ from ..scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, li
 from .utils import build_service
 
 from copy import deepcopy
-from typing import Any, Dict, List, Mapping, Tuple
+from typing import Any, Dict, List, Mapping, Tuple, Union
 
 
 class ServiceGenerator:
@@ -61,31 +61,62 @@ class ServiceGenerator:
                  file_name: Path,
                  path_config: Path,
                  n_services: int = 1,
+                 n_services_by_ru: Mapping[str, int] = None,
                  seed: int = None
-        ) -> List[Service]:
+                 ) -> List[Service]:
         """
-        Generate a list of services
+        Generate a list of services.
+
+        If the optional parameter n_services_by_ru is provided (a mapping from RU id to number of services),
+        then for each RU the specified number of services will be generated. Otherwise, n_services will be used
+        as a global counter.
 
         Args:
-            file_name (Path): Name of the output file
-            path_config (Path): Path to the config file
-            n_services (int, optional): Number of services to generate. Defaults to 1.
-            seed (int, optional): Seed for the random number generator. Defaults to None.
+            file_name (Path): Name of the output file.
+            path_config (Path): Path to the config file.
+            n_services (int, optional): Number of services to generate (if n_services_by_ru is not provided). Defaults to 1.
+            n_services_by_ru (Mapping[str, int], optional): Mapping of RU id (TSP id) to the number of services to generate.
+            seed (int, optional): Seed for the random number generator.
 
         Returns:
-            List[Service]: List of services
+            List[Service]: List of generated Service objects.
         """
         if seed is not None:
             self.set_seed(seed)
         self._set_config(path_config)
 
         services = []
-        for i in range(n_services):
-            services.append(self._generate_service(id_=str(i)))
+        # Generate services per RU if a mapping is provided
+        if n_services_by_ru is not None:
+            for ru_id, count in n_services_by_ru.items():
+                for j in range(count):
+                    service_id = f"{ru_id}_{j}"
+                    service = self._generate_service_for_ru(ru_id, service_id)
+                    services.append(service)
+        else:
+            for i in range(n_services):
+                services.append(self._generate_service(id_=str(i)))
 
         self.services = services
         self.save_to_yaml(services, file_name)
         return services
+
+    def _generate_service_for_ru(self, ru_id: str, id_: str) -> Service:
+        """
+        Generate a random service for a specified RU.
+
+        This method uses the provided RU id to pick the corresponding TSP and then creates
+        a service using random line, time slot, rolling stock, date, and prices.
+
+        Args:
+            ru_id (str): The RU (TSP) identifier.
+            id_ (str): The identifier to assign to the generated service.
+
+        Returns:
+            Service: The generated service object.
+        """
+        tsp = self.tsps[ru_id]  # use the specified RU/TSP
+        return self._generate_service(id_, provide_tsp=tsp)
 
     def save_to_yaml(self, services: List[Service], file_name: Path) -> None:
         """
@@ -112,7 +143,7 @@ class ServiceGenerator:
 
         self._write_to_yaml(file_name, yaml_dict)
 
-    def _generate_service(self, id_: str) -> Service:
+    def _generate_service(self, id_: str, provide_tsp: Union[TSP, None] = None) -> Service:
         """
         Generate a random service
 
@@ -121,7 +152,7 @@ class ServiceGenerator:
         """
         line = self._get_random_line(id_)
         time_slot = self._get_random_time_slot()
-        tsp = self._get_random_tsp()
+        tsp = provide_tsp if provide_tsp else self._get_random_tsp()
         rs = self._get_random_rs(tsp)
         date = self._get_random_date()
         prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
