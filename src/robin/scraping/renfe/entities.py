@@ -27,7 +27,7 @@ SCHEDULE_URL = 'https://horarios.renfe.com/HIRRenfeWeb/'
 # Renfe stations CSV path
 SAVE_PATH = 'data/renfe'
 RENFE_STATIONS_CSV = f'{SAVE_PATH}/renfe_stations.csv'
-LR_RENFE_SERVICES = ['AVE', 'AVLO', 'ALVIA', 'AVANT']
+LR_RENFE_SERVICES = ['AVE', 'AVLO']
 
 
 class DriverManager:
@@ -124,7 +124,9 @@ class DriverManager:
     def _get_trip_data(
             self,
             row: bs4.element.ResultSet,
-            date: datetime.date
+            date: datetime.date,
+            origin_id: str,
+            destination_id: str
     ) -> Tuple[str, str, Dict[str, Tuple[int, int]], datetime.datetime, int, Dict[str, float]]:
         """
         Returns the data of a trip retrieved from a row from the schedules table.
@@ -142,7 +144,7 @@ class DriverManager:
 
         schedule_link = row[0].find('a')['href']
         trip_url = DriverManager._get_trip_url(schedule_link=schedule_link, schedule_url=SCHEDULE_URL)
-        trip_schedule = self._scrape_trip_schedule(url=trip_url)
+        trip_schedule = self._scrape_trip_schedule(url=trip_url, origin_id=origin_id, destination_id=destination_id)
 
         html_prices = re.sub(r'\s+', '', row[4].find('div').text)
         raw_prices = re.sub(r'PrecioInternet|:', '', html_prices).replace(',', '.')
@@ -173,7 +175,11 @@ class DriverManager:
             return False
         return True
 
-    def _scrape_trip_schedule(self, url: str) -> Dict[str, Tuple[int, int]]:
+    def _scrape_trip_schedule(self,
+                              url: str,
+                              origin_id: str,
+                              destination_id: str
+        ) -> Dict[str, Tuple[int, int]]:
         """
         Returns dictionary of stops from URL with stops information from Renfe.
 
@@ -189,7 +195,10 @@ class DriverManager:
         soup = BeautifulSoup(req.text, 'html.parser')
         table = soup.select_one('.irf-renfe-travel__table.cabecera_tabla')
 
+        origin_adif_id = self.stations_df[self.stations_df['renfe_id'] == origin_id]['stop_id'].values[0]
+        destination_adif_id = self.stations_df[self.stations_df['renfe_id'] == destination_id]['stop_id'].values[0]
         trip_schedule = {}
+        start = False
         for row in table.select('tr'):
             aux = row.select('td')
             if not aux:
@@ -197,9 +206,19 @@ class DriverManager:
 
             raw_table_name = aux[0].text.strip()
             station_id = self._get_name_best_match(raw_table_name)
+            if station_id != origin_adif_id and not start:
+                continue
+            else:
+                start = True
+
+            if station_id not in self.stations_df['stop_id'].values:
+                continue
             departure_time = time_to_minutes(aux[1].text.strip())
             arrival_time = time_to_minutes(aux[2].text.strip())
             trip_schedule[station_id] = (departure_time, arrival_time)
+
+            if station_id == destination_adif_id:
+                break
 
         # Get first and last stations and set their arrival and departure times to the same value
         first_station, *_, last_station = trip_schedule.keys()
@@ -482,7 +501,8 @@ class DriverManager:
             train_type = remove_blanks(x=train_type, replace_by='')
             if train_type not in self.allowed_train_types:
                 continue
-            service_data = self._get_trip_data(row=row, date=date)
+            service_data = self._get_trip_data(row=row, date=date, origin_id=origin_id, destination_id=destination_id)
+            if len(service_data[2]) < 2: continue
             rows.append(service_data)
         date += datetime.timedelta(days=1)
 
