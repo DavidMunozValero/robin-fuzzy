@@ -3,7 +3,6 @@
 import datetime
 import numpy as np
 import os
-from pathlib import Path
 import random
 import yaml
 
@@ -15,6 +14,9 @@ from ..scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, li
 from .utils import build_service
 
 from copy import deepcopy
+from functools import cache
+from geopy.distance import geodesic
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Tuple, Union
 
 
@@ -150,13 +152,20 @@ class ServiceGenerator:
         Returns:
             Service: Service object
         """
-        line = self._get_random_line(id_)
-        time_slot = self._get_random_time_slot()
-        tsp = provide_tsp if provide_tsp else self._get_random_tsp()
-        rs = self._get_random_rs(tsp)
-        date = self._get_random_date()
-        prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
-        service = build_service(id_=id_, date=date, line=line, time_slot=time_slot, tsp=tsp, rs=rs, prices=prices)
+        feasible = False
+
+        while not feasible:
+            line = self._get_random_line(id_)
+            time_slot = self._get_random_time_slot()
+            tsp = provide_tsp if provide_tsp else self._get_random_tsp()
+            rs = self._get_random_rs(tsp)
+            date = self._get_random_date()
+            prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
+            service = build_service(id_=id_, date=date, line=line, time_slot=time_slot, tsp=tsp, rs=rs, prices=prices)
+
+            # Check if the service is feasible
+            if not self._get_conflict_matrix(service).any():
+                feasible = True
 
         self.services.append(service)
         return service
@@ -171,6 +180,137 @@ class ServiceGenerator:
         with open(path_config, 'r') as f:
             config = yaml.safe_load(f)
         self.config = config
+
+    def get_stations_positions(
+            self,
+            stations: List[Station],
+            scale: Union[int, None] = None
+        ) -> Mapping[Station, float]:
+        stations_positions = {}
+        prev_station = None
+        for i, station in enumerate(stations):
+            if i == 0:
+                stations_positions[station] = 0
+            else:
+                prev_distance = tuple(stations_positions.values())[-1]
+                stations_distance = geodesic(prev_station.coords, station.coords).km
+                stations_positions[station] = prev_distance + stations_distance
+            prev_station = station
+
+        if not scale:
+            return stations_positions
+
+        max_distance = tuple(stations_positions.values())[-1]
+        for station in stations_positions:
+            stations_positions[station] = np.round(stations_positions[station] / max_distance * 1000, 2)
+
+        return stations_positions
+
+    def _get_conflict_matrix(self,
+                             service: Service
+        ) -> np.array:
+        """
+        Compute the conflict matrix among services based on the updated schedule.
+
+        Returns:
+            A boolean numpy array where each entry [i, j] indicates whether service i and service j conflict.
+        """
+        line_stations = self.get_stations_positions(service.line.stations)
+        services = [s for s in self.services if s.line == service.line]
+        services = services + [service]
+
+        @cache
+        def get_x_line_equation(A, B):
+            x_coords = (A[0].total_seconds()//60, B[0].total_seconds()//60)
+            y_coords = (A[1], B[1])
+            print(x_coords, y_coords)
+            m = (y_coords[1] - y_coords[0]) / (x_coords[1] - x_coords[0])
+            c = y_coords[0] - m * x_coords[0]
+            return lambda y: (y - c) / m
+
+        def infer_times(service: Service, station: Station, origin: bool = True) -> float:
+            idx = 1 if origin else 0
+            if station in service.line.stations:
+                station_idx = service.line.stations.index(station)
+                return service.schedule[station_idx][idx].total_seconds()//60
+
+            stations = service.line.stations
+            station_pos = line_stations[station]
+            before, after = None, None
+            stations_pos = [line_stations[s] for s in stations]
+            for i in range(len(stations) - 1):
+                if stations_pos[i] < station_pos < stations_pos[i + 1]:
+                    before = stations[i]
+                    after = stations[i + 1]
+                    break
+            if before is None or after is None:
+                raise ValueError(f"Station {station} not found in service {service}")
+            before_idx = stations.index(before)
+            after_idx = stations.index(after)
+            A = (service.schedule[before_idx][1], line_stations[before])
+            B = (service.schedule[after_idx][0], line_stations[after])
+            line_eq = get_x_line_equation(A, B)
+            return line_eq(line_stations[station])
+
+        n = len(services)
+        conflict_matrix = np.zeros((n, n), dtype=bool)
+
+        for i, service in enumerate(services):
+            stop_keys = service.line.stations
+            for k in range(len(stop_keys) - 1):
+                departure_station = stop_keys[k]
+                arrival_station = stop_keys[k + 1]
+                arrival_time = service.schedule[k + 1][0]
+
+                for j, other_service in enumerate(services):
+                    if other_service == service or conflict_matrix[i, j]:
+                        continue
+
+                    other_first_departure = other_service.schedule[0][1]
+                    if other_first_departure > arrival_time:
+                        continue
+
+                    other_stop_keys = other_service.line.stations
+                    stations_between = [
+                        s for s in other_stop_keys
+                        if line_stations[departure_station] <= line_stations[s] <= line_stations[
+                            arrival_station]
+                    ]
+                    if not stations_between:
+                        continue
+
+                    trips = set()
+                    for s in stations_between:
+                        idx = other_stop_keys.index(s)
+                        if 0 < idx < len(other_stop_keys) - 1:
+                            trips.add((other_stop_keys[idx - 1], s))
+                            trips.add((s, other_stop_keys[idx + 1]))
+                        elif idx == 0:
+                            trips.add((s, other_stop_keys[idx + 1]))
+                        elif idx == len(other_stop_keys) - 1:
+                            trips.add((other_stop_keys[idx - 1], s))
+
+                    for trip in trips:
+                        other_start, other_end = trip
+                        inference_departure_station = max(
+                            [departure_station, other_start], key=lambda x: line_stations[x]
+                        )
+                        inference_arrival_station = min(
+                            [arrival_station, other_end], key=lambda x: line_stations[x]
+                        )
+                        other_departure_time = infer_times(other_service, inference_departure_station, origin=True)
+                        other_arrival_time = infer_times(other_service, inference_arrival_station, origin=False)
+                        original_departure_time = infer_times(service, inference_departure_station, origin=True)
+                        original_arrival_time = infer_times(service, inference_arrival_station, origin=False)
+                        dt_gap = other_departure_time - original_departure_time
+                        at_gap = other_arrival_time - original_arrival_time
+                        same_sign = dt_gap * at_gap > 0
+                        if same_sign:
+                            continue
+                        else:
+                            conflict_matrix[i, j] = True
+                            conflict_matrix[j, i] = True
+        return conflict_matrix
 
     def _get_random_rs(self, tsp: TSP) -> RollingStock:
         """
@@ -191,8 +331,9 @@ class ServiceGenerator:
         Returns:
             TSP: TSP object randomly selected from the available TSPs
         """
-        tsp_probabilities = self.config['tsps']['probabilities']
-        return random.choices(list(self.tsps.values()), weights=list(tsp_probabilities.values()))[0]
+        #tsp_probabilities = self.config['tsps']['probabilities']
+        #return random.choices(list(self.tsps.values()), weights=list(tsp_probabilities.values()))[0]
+        return random.choices(list(self.tsps.values()))[0]
 
     def _get_random_date(self) -> datetime.date:
         """
