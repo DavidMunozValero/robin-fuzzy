@@ -3,15 +3,14 @@
 import numpy as np
 import pandas as pd
 
-from ..supply.entities import Station, TimeSlot, Corridor, Line, Seat, RollingStock, TSP, Service, Supply
-from ..supply.utils import get_time
-from ..scraping.utils import *
+from robin.supply.entities import Station, TimeSlot, Corridor, Line, Seat, RollingStock, TSP, Service, Supply
+from robin.supply.utils import get_time
+from robin.scraping.utils import *
 
-from ast import literal_eval
 from collections import OrderedDict
-from datetime import timedelta
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 
+RENFE_STATIONS_PATH = f'data/renfe/renfe_stations.csv'
 DEFAULT_SEAT_QUANTITY = {1: 250, 2: 50}
 INFLATION = 1.0
 
@@ -35,7 +34,7 @@ class DataLoader:
         services (Dict[str, Service]): Dictionary with services
     """
 
-    def __init__(self, stops_path: str, renfe_stations_path: str):
+    def __init__(self, stops_path: str, renfe_stations_path: str = RENFE_STATIONS_PATH):
         """
         Constructor of the class
 
@@ -44,24 +43,19 @@ class DataLoader:
             renfe_stations_path (str, optional): Path to the renfe stations csv file.
         """
         self._stops_path = stops_path
-        self._path_root = os.path.dirname(self._stops_path)
+        self._path_root = os.path.dirname(os.path.dirname(self._stops_path))
         self._scraping_id = self._get_scraping_id()
         self._prices_path = f"{self._path_root}/prices/prices_{self._scraping_id}.csv"
         self.origin_id, self.destination_id, self.start_date, self.end_date = self._scraping_id.split('_')
 
-        self._trips_path = f"{self._path_root}/trips_{self._scraping_id}.csv"
-        self.trips = self._load_dataframe(path=self._trips_path, data_type={'trip_id': str, 'service_id': str})
         self.prices = self._load_dataframe(path=self._prices_path, data_type={'origin': str, 'destination': str})
-
-        if not self.prices:
-            self.prices = self.trips.apply(self._prices_from_trips, axis=1)
-
         self.stops = self._load_dataframe(path=self._stops_path, data_type={'stop_id': str})
         self.renfe_stations = pd.read_csv(filepath_or_buffer=renfe_stations_path,
                                           delimiter=',',
                                           dtype={'stop_id': str})
 
         self.trips = pd.DataFrame({'service_id': list(OrderedDict.fromkeys(self.stops['service_id']))})
+
         self._seat_names = self.prices.columns[-3:]
         self.seats = {}
         self.stations = {}
@@ -71,47 +65,6 @@ class DataLoader:
         self.tsps = {}
         self.time_slots = {}
         self.services = []
-
-    def _prices_from_trips(self, row) -> pd.Series:
-        # Convertir la columna 'schedule' de string a diccionario
-        schedule = literal_eval(row['schedule'])
-        # Convertir la columna 'price' de string a diccionario
-        prices = literal_eval(row['price'])
-
-        # Ordenar el schedule según el offset de salida (el primer valor de cada tupla)
-        # De esta forma, la primera estación será la de origen y la última la de destino.
-        schedule_ordenado = sorted(schedule.items(), key=lambda x: x[1][0])
-        origin = schedule_ordenado[0][0]
-        destination = schedule_ordenado[-1][0]
-
-        # Convertir la columna 'departure' a datetime
-        departure = pd.to_datetime(row['departure'])
-        # Se asume que el offset de llegada está en minutos y corresponde al segundo valor de la tupla de la estación destino
-        arrival_offset = schedule_ordenado[-1][1][1]
-        arrival = departure + timedelta(minutes=arrival_offset)
-
-        # Calcular la duración como diferencia entre arrival y departure
-        duration = arrival - departure
-
-        # Mapear los precios:
-        # 'Turist' -> Basico, 'TuristaPlu' -> Elige y 'Premium' si existiera.
-        basico = prices.get('Turist', np.nan)
-        elige = prices.get('TuristaPlu', np.nan)
-        premium = prices.get('Premium', np.nan)
-
-        return pd.Series({
-            'trip_id': row['trip_id'],
-            'origin': origin,
-            'destination': destination,
-            'train_type': row['train_type'],
-            'departure': departure,
-            'arrival': arrival,
-            'duration': duration,
-            'service_id': row['service_id'],
-            'Basico': basico,
-            'Elige': elige,
-            'Premium': premium
-        })
 
     def build_supply_entities(self, seat_quantity: Mapping[int, int] = DEFAULT_SEAT_QUANTITY) -> None:
         """
@@ -206,7 +159,7 @@ class DataLoader:
         for trip in list_stations:
             for i, s in enumerate(trip):
                 if s not in corridor_stations:
-                    corridor_stations.insert(corridor_stations.index(trip[i - 1]) + 1, s)
+                    corridor_stations.insert(corridor_stations.index(trip[i + 1]), s)
 
         return corridor_stations
 
@@ -231,6 +184,9 @@ class DataLoader:
     def _build_corridor(self) -> None:
         """
         Get corridor from stops dataframe
+
+        Returns:
+            corridor: list of Station() objects
         """
         # Get list of stations in corridor
         corridor_stations = self._get_corridor_stations()
@@ -262,7 +218,7 @@ class DataLoader:
         Get line from stops dataframe
         Args:
             stops: dataframe with stops
-            corridor: Corridor() object
+            corr: Corridor() object
         Returns:
              Line() object
         """
@@ -367,6 +323,8 @@ class DataLoader:
 
         Args:
             service_id: string
+            departure: string
+            price: tuple of floats
             line: Line() object
             tsp: TSP() object
             rs: RollingStock() object
@@ -389,7 +347,7 @@ class DataLoader:
                        rolling_stock=rs,
                        prices=total_prices)
 
-    def _load_dataframe(self, path: str, data_type: Dict = None) -> Union[None, pd.DataFrame]:
+    def _load_dataframe(self, path: str, data_type: Dict = None) -> pd.DataFrame:
         """
         Load dataframe from csv file
 
@@ -400,9 +358,6 @@ class DataLoader:
         Returns:
             pd.dataframe
         """
-        # chech if file exists
-        if not os.path.exists(path):
-            return
         return pd.read_csv(path, delimiter=',', dtype=data_type)
 
 
@@ -422,13 +377,12 @@ class SupplySaver(Supply):
         """
         Supply.__init__(self, services)
 
-    def to_yaml(self, filename: str, save_path: str) -> None:
+    def to_yaml(self, output_path: str = 'supply_data.yaml') -> None:
         """
         Save supply entities to yaml file
 
         Args:
-            filename (str): File name for the yaml file
-            save_path (str): Path to save yaml file
+            output_path (str): Path to output yaml file
         """
         data = [
             ('stations', [station_to_dict(stn) for stn in self.stations]),
@@ -442,4 +396,4 @@ class SupplySaver(Supply):
         ]
 
         for key, value in data:
-            write_to_yaml(save_path+filename, {key: value})
+            write_to_yaml(output_path, {key: value})
