@@ -152,20 +152,13 @@ class ServiceGenerator:
         Returns:
             Service: Service object
         """
-        feasible = False
-
-        while not feasible:
-            line = self._get_random_line(id_)
-            time_slot = self._get_random_time_slot()
-            tsp = provide_tsp if provide_tsp else self._get_random_tsp()
-            rs = self._get_random_rs(tsp)
-            date = self._get_random_date()
-            prices = self._get_random_prices(line, rs, tsp)  # prices: Dict[Tuple[str, str], Dict[Seat, float]]
-            service = build_service(id_=id_, date=date, line=line, time_slot=time_slot, tsp=tsp, rs=rs, prices=prices)
-
-            # Check if the service is feasible
-            if not self._get_conflict_matrix(service).any():
-                feasible = True
+        line = self._get_random_line(id_)
+        time_slot = self._get_random_time_slot()
+        tsp = provide_tsp if provide_tsp else self._get_random_tsp()
+        rs = self._get_random_rs(tsp)
+        date = self._get_random_date()
+        prices = self._get_random_prices(line, rs, tsp)
+        service = build_service(id_=id_, date=date, line=line, time_slot=time_slot, tsp=tsp, rs=rs, prices=prices)
 
         self.services.append(service)
         return service
