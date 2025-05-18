@@ -3,12 +3,12 @@
 import datetime
 import re
 
-from .exceptions import InvalidTimeStringFormat, InvalidDateStringFormat
+from robin.supply.exceptions import InvalidTimeStringFormat, InvalidDateStringFormat
 
-from typing import Dict, Set, Tuple
+from typing import Dict, Set
 
 
-def get_time(time) -> datetime.timedelta:
+def get_time(time: str) -> datetime.timedelta:
     """
     Function which returns a datetime.timedelta object from a string time in format HH:MM:SS.
 
@@ -30,7 +30,7 @@ def get_time(time) -> datetime.timedelta:
     return datetime.timedelta(hours=int(h), minutes=int(m), seconds=int(s))
 
 
-def get_date(date) -> datetime.date:
+def get_date(date: str) -> datetime.date:
     """
     Function which returns a datetime.date object from a string date in format YYYYY-mm-dd.
 
@@ -106,17 +106,3 @@ def convert_tree_to_dict(tree: Dict) -> Dict[str, Dict]:
         return {}
 
     return {node['org']: convert_tree_to_dict(node['des']) for node in tree}
-
-
-def get_euclidean_distance(a: Tuple[float, float], b: Tuple[float, float]):
-    """
-    Returns the Euclidean distance between two points.
-
-    Args:
-        a (Tuple[float, float]): The first point.
-        b (Tuple[float, float]): The second point.
-
-    Returns:
-        float: The Euclidean distance between the two points.
-    """
-    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
