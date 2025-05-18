@@ -8,9 +8,8 @@ import yaml
 
 from ..supply.entities import Station, Corridor, Seat, TimeSlot, TSP, Line, RollingStock, Service
 from ..supply.utils import convert_tree_to_dict, set_stations_ids, get_time
+from ..supply.saver.entities import SupplySaver
 from .utils import _get_distance
-from ..scraping.utils import station_to_dict, seat_to_dict, corridor_to_dict, line_to_dict, \
-    rolling_stock_to_dict, time_slot_to_dict, tsp_to_dict, service_to_dict
 from .utils import build_service
 
 from copy import deepcopy
@@ -60,7 +59,7 @@ class ServiceGenerator:
         self.services = []
 
     def generate(self,
-                 file_name: Path,
+                 output_path: Path,
                  path_config: Path,
                  n_services: int = 1,
                  n_services_by_ru: Mapping[str, int] = None,
@@ -100,7 +99,8 @@ class ServiceGenerator:
                 services.append(self._generate_service(id_=str(i)))
 
         self.services = services
-        self.save_to_yaml(services, file_name)
+        if output_path:
+            SupplySaver(self.services).to_yaml(output_path)
         return services
 
     def _generate_service_for_ru(self, ru_id: str, id_: str) -> Service:
@@ -119,31 +119,6 @@ class ServiceGenerator:
         """
         tsp = self.tsps[ru_id]  # use the specified RU/TSP
         return self._generate_service(id_, provide_tsp=tsp)
-
-    def save_to_yaml(self, services: List[Service], file_name: Path) -> None:
-        """
-        Save the data to a yaml file
-
-        Args:
-            services (List[Service]): List of Service objects
-            file_name (Path): Name of the output file
-
-
-        Returns:
-            None
-        """
-        rolling_stocks = list(set([rs for tsp in self.tsps.values() for rs in tsp.rolling_stock]))
-
-        yaml_dict = {'stations': [station_to_dict(stn) for stn in self.stations.values()],
-                     'seat': [seat_to_dict(s) for s in self.seats.values()],
-                     'corridor': [corridor_to_dict(corr) for corr in self.corridors.values()],
-                     'line': [line_to_dict(service.line) for service in services],
-                     'rollingStock': [rolling_stock_to_dict(rs) for rs in rolling_stocks],
-                     'trainServiceProvider': [tsp_to_dict(tsp) for tsp in self.tsps.values()],
-                     'timeSlot': [time_slot_to_dict(s) for s in self.time_slots.values()],
-                     'service': [service_to_dict(serv) for serv in services]}
-
-        self._write_to_yaml(file_name, yaml_dict)
 
     def _generate_service(self, id_: str, provide_tsp: Union[TSP, None] = None) -> Service:
         """
