@@ -116,6 +116,6 @@ def _get_distance(line: Line, origin: Station, destination: Station) -> float:
     earth_radius = 6371.0
     assert origin in line.stations and destination in line.stations, 'Stations not in line'
 
-    lat1, lon1, lat2, lon2 = map(radians, [*origin.coords, *destination.coords])
+    lat1, lon1, lat2, lon2 = map(radians, [*origin.coordinates, *destination.coordinates])
     lon_diff = lon2 - lon1
     return acos(sin(lat1) * sin(lat2) + cos(lat1) * cos(lat2) * cos(lon_diff)) * earth_radius
