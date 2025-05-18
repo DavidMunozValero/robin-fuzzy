@@ -193,7 +193,7 @@ class ServiceGenerator:
                 stations_positions[station] = 0
             else:
                 prev_distance = tuple(stations_positions.values())[-1]
-                stations_distance = geodesic(prev_station.coords, station.coords).km
+                stations_distance = geodesic(prev_station.coordinates, station.coordinates).km
                 stations_positions[station] = prev_distance + stations_distance
             prev_station = station
 
