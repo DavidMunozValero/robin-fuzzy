@@ -41,6 +41,9 @@ class Segment:
     path: List[Station]
     time_at: Callable[[Station], datetime.datetime]
     edges: List[Tuple[Station, Station]] = field(init=False)
+    distances: List[float]
+    total: float
+    duration: datetime
 
     def __hash__(self):
         return hash((self.service_id, tuple(self.path)))
@@ -131,7 +134,14 @@ class ServiceScheduler:
             arrival_time = datetime.datetime.combine(service.date, midnight) + arrival_delta
 
             time_at = ServiceScheduler._make_time_interpolator(subpath, distances, departure_time, arrival_time)
-            segments.append(Segment(service_id=service.id, path=subpath, time_at=time_at))
+            total = distances[-1] or 1.0  # Avoid division by zero if path is empty
+            duration = arrival_time - departure_time
+            segments.append(
+                Segment(
+                    service_id=service.id, path=subpath, time_at=time_at,
+                    distances=distances, total=total, duration=duration
+                )
+            )
         return segments
 
     @staticmethod
